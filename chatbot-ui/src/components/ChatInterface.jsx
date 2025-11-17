@@ -771,30 +771,29 @@ function ChatInterface() {
         {/* Messages Container */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8 lg:p-10 min-h-0">
           {messages.length === 0 ? (
-            <div className="h-full flex flex-col items-center justify-center animate-fade-in">
-              <div className="w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 rounded-2xl sm:rounded-3xl flex items-center justify-center mb-6 sm:mb-8" style={{ backgroundColor: colors.primary }}>
-                <svg className="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="h-full flex flex-col items-center justify-center">
+              <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4" style={{ backgroundColor: colors.primary }}>
+                <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
                 </svg>
               </div>
-              <h2 className="text-3xl font-bold mb-4" style={{ color: colors.text }}>Welcome to Memorybank</h2>
-              <p className="mb-12 text-center max-w-md" style={{ color: colors.textLight }}>
+              <h2 className="text-2xl font-bold mb-2" style={{ color: colors.text }}>Welcome to Memorybank</h2>
+              <p className="mb-6 text-center max-w-md text-sm" style={{ color: colors.textLight }}>
                 AI assistant with persistent memory powered by vector embeddings
               </p>
 
-              <div className="grid grid-cols-1 2xl:grid-cols-3 gap-5 w-full max-w-3xl">
+              <div className="space-y-2 w-full max-w-md">
                 {starterPrompts.map((prompt, index) => (
-                  <button
+                  <div
                     key={index}
-                    onClick={() => handleStarterPrompt(prompt.text)}
-                    className="group p-5 2xl:p-7 rounded-2xl transition-all duration-200 hover:scale-105 active:scale-95 hover:shadow-lg text-left flex 2xl:flex-col items-center 2xl:items-start gap-4 2xl:gap-0"
+                    className="p-3 rounded-lg text-left flex items-center gap-3"
                     style={{ backgroundColor: colors.surface, borderWidth: '1px', borderStyle: 'solid', borderColor: colors.border }}
                   >
-                    <div className="w-10 h-10 2xl:w-14 2xl:h-14 rounded-xl 2xl:rounded-2xl flex items-center justify-center flex-shrink-0 2xl:mb-5 group-hover:scale-110 transition-transform duration-300" style={{ backgroundColor: colors.hover }}>
+                    <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: colors.hover }}>
                       {prompt.icon}
                     </div>
-                    <p className="text-sm font-medium flex-1" style={{ color: colors.text }}>{prompt.text}</p>
-                  </button>
+                    <p className="text-sm" style={{ color: colors.text }}>{prompt.text}</p>
+                  </div>
                 ))}
               </div>
             </div>
@@ -901,10 +900,10 @@ function ChatInterface() {
         </div>
 
         {/* Input Container with Memory Source Selection */}
-        <div className="p-4 sm:p-6 lg:p-8 flex-shrink-0" style={{ borderTopWidth: '1px', borderTopStyle: 'solid', borderTopColor: colors.border }}>
+        <div className="p-3 sm:p-4 lg:p-5 flex-shrink-0" style={{ borderTopWidth: '1px', borderTopStyle: 'solid', borderTopColor: colors.border }}>
           {/* Memory Source Buttons */}
-          <div className="max-w-4xl mx-auto mb-5">
-            <div className="flex items-center gap-3">
+          <div className="max-w-4xl mx-auto mb-3">
+            <div className="flex items-center gap-2">
               <span className="text-xs font-semibold" style={{ color: colors.textLight }}>Memory Mode:</span>
               <div className="flex gap-3">
                 <button
