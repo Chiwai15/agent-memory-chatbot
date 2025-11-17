@@ -1,0 +1,91 @@
+# Environment Variables (contains API keys - NEVER commit!)
+.env
+.env.local
+.env.production
+.env.*.local
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environments
+.venv/
+venv/
+ENV/
+env/
+.virtualenv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Type Checking
+.mypy_cache/
+.dmypy.json
+dmyp.json
+
+# Database
+*.db
+*.sqlite3
+*.dump
+*.sql
+
+# Logs
+*.log
+logs/
+
+# Graph Visualizations
+graph.png
+workflow.png
+*.mermaid.png
+
+# Temporary Files
+*.tmp
+*.bak
+*.orig
+
+# Docker
+docker-compose.override.yml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project Specific
+backup/
+secrets/
+*.key
+*.pem
+
+# NOTE: docs/ directory should be committed (contains documentation)
+# Only exclude generated/temporary docs files if needed

@@ -1,0 +1,26 @@
+@import "tailwindcss";
+
+@layer base {
+  body {
+    margin: 0;
+    padding: 0;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    background: linear-gradient(135deg, #f0f9ff 0%, #f0f6ff 50%, #ffffff 100%);
+    min-height: 100vh;
+  }
+}
+
+@layer utilities {
+  .glass-effect {
+    backdrop-filter: blur(1rem);
+    background: rgba(255, 255, 255, 0.8);
+    border: 0px solid rgba(59, 130, 246, 0.15);
+  }
+
+  .glass-hover:hover {
+    background: rgba(255, 255, 255, 0.9);
+    border-color: rgba(59, 130, 246, 0.25);
+    transition: all 0.3s;
+  }
+}
