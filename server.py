@@ -152,13 +152,13 @@ async def extract_memories_with_llm(
             context += f"{role}: {msg.get('content', '')}\n"
         context += f"User: {message}\n"
 
-        # Prompt for entity extraction
-        extraction_prompt = f"""You are an expert at extracting memorable information from conversations with TEMPORAL AWARENESS.
+        # Prompt for entity extraction with 5W1H context
+        extraction_prompt = f"""You are an expert at extracting memorable information from conversations with COMPLETE CONTEXT (5W1H: Who, What, When, Where, Why, How).
 
 CONVERSATION CONTEXT:
 {context}
 
-TASK: Analyze the user's latest message and determine if it contains information worth remembering long-term.
+TASK: Analyze the user's latest message and extract information with FULL CONTEXTUAL DETAILS in a SINGLE pass.
 
 EXTRACT these entity types:
 - person_name: User's name or names of people mentioned
@@ -167,10 +167,29 @@ EXTRACT these entity types:
 - location: Cities, countries, addresses
 - preference: Likes, dislikes, preferences (food, hobbies, etc.)
 - fact: General facts about the user
-- relationship: Family members, friends, relationships
+- relationship: Family members, friends, colleagues WITH CONTEXT
 
-TEMPORAL AWARENESS (CRITICAL):
-For each entity, identify the temporal_status:
+CRITICAL: CAPTURE COMPLETE CONTEXT (5W1H)
+For each entity, include ALL relevant context in the VALUE field:
+- WHO: Include names, relationships, people involved
+- WHAT: The specific activity, object, or information
+- WHEN: Time references (past, current, future, specific times)
+- WHERE: Locations if mentioned
+- WHY: Reasons or motivations if stated
+- HOW: Methods or manner if relevant
+
+EXAMPLES OF COMPLETE CONTEXT:
+❌ BAD (Incomplete):
+  - fact: "collaborate on lesson plans"
+  - preference: "basketball"
+  - relationship: "friend"
+
+✅ GOOD (Complete Context):
+  - relationship: "collaborates with Sarah on lesson plans"
+  - preference: "plays basketball every Saturday at Central Park"
+  - relationship: "childhood friend Mike from Boston"
+
+TEMPORAL AWARENESS:
 - "past": Things that were true but are no longer (e.g., "I lived in Hong Kong", "I used to work at Google")
 - "current": Things that are currently true (e.g., "I live in Canada now", "I am a developer")
 - "future": Future plans or intentions (e.g., "I will move to Japan", "I plan to become a manager")
