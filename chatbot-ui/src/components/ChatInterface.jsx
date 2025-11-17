@@ -647,13 +647,10 @@ function ChatInterface() {
                 }
                 playPersonaDemo();
               }}
-              className="px-4 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 hover:scale-105 active:scale-95 flex items-center gap-2"
+              className="px-4 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 hover:scale-105 active:scale-95 hover:opacity-80 flex items-center gap-2"
               style={{
-                backgroundColor: isPlaying ? colors.secondary : colors.surface,
-                color: isPlaying ? 'white' : colors.text,
-                borderWidth: '1px',
-                borderStyle: 'solid',
-                borderColor: isPlaying ? colors.secondary : colors.border
+                backgroundColor: colors.accent,
+                color: colors.textOnDark
               }}
             >
               {isPlaying ? (
