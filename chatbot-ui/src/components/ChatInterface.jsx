@@ -987,7 +987,7 @@ function ChatInterface() {
                       color: penseiveView === 'short' ? 'white' : colors.text
                     }}
                   >
-                    💬 Short-term
+                    💬 Short-term (Last 30)
                   </button>
                   <button
                     onClick={() => setPenseiveView('long')}
@@ -997,7 +997,7 @@ function ChatInterface() {
                       color: penseiveView === 'long' ? 'white' : colors.text
                     }}
                   >
-                    💾 Long-term
+                    💾 Long-term (Entities)
                   </button>
                 </div>
               )}
@@ -1066,8 +1066,13 @@ function ChatInterface() {
                     {/* Long-term Memories (PostgreSQL Store) */}
                     {showLong && (
                       <div className="space-y-4">
-                        <div className="text-xs font-semibold uppercase tracking-wider" style={{ color: colors.text }}>
-                          Long-term Memory
+                        <div className="flex items-center justify-between">
+                          <div className="text-xs font-semibold uppercase tracking-wider" style={{ color: colors.text }}>
+                            Long-term Memory (Entities)
+                          </div>
+                          <div className="text-xs px-2 py-1 rounded" style={{ backgroundColor: colors.hover, color: colors.textLight }}>
+                            Phase 1
+                          </div>
                         </div>
 
                         {debugData && debugData.longTerm && debugData.longTerm.memories && debugData.longTerm.memories.length > 0 ? (
@@ -1088,11 +1093,19 @@ function ChatInterface() {
                           </div>
                         ) : (
                           <div className="rounded-xl p-4 text-center" style={{ backgroundColor: colors.surface, borderWidth: '1px', borderStyle: 'solid', borderColor: colors.border }}>
-                            <p className="text-xs mb-2" style={{ color: colors.textLight }}>
-                              No long-term memories stored yet
+                            <p className="text-xs mb-2 font-medium" style={{ color: colors.textLight }}>
+                              No entities extracted yet
                             </p>
-                            <p className="text-xs" style={{ color: colors.textLight }}>
-                              Use trigger phrases: "My name is...", "I am...", "I like...", "I love...", "I prefer..."
+                            <p className="text-xs mb-2" style={{ color: colors.textLight }}>
+                              LLM automatically extracts:
+                            </p>
+                            <div className="text-xs space-y-1" style={{ color: colors.textLight }}>
+                              <p>• Names, ages, professions</p>
+                              <p>• Locations (with past/current/future)</p>
+                              <p>• Preferences, facts, relationships</p>
+                            </div>
+                            <p className="text-xs mt-2" style={{ color: colors.textLight, opacity: 0.7 }}>
+                              Confidence ≥ 0.5 | Temporal awareness enabled
                             </p>
                           </div>
                         )}
