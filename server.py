@@ -660,12 +660,7 @@ async def inspect_all_memories(user_id: Optional[str] = None):
             all_memories = [
                 {
                     "text": d.value.get("data", ""),
-                    "metadata": {
-                        "user_id": user_id,
-                        "timestamp": d.value.get("timestamp", ""),
-                        "level": 1,
-                        "category": "general"
-                    }
+                    "metadata": d.value  # Return ALL metadata including reference_sentence
                 }
                 for d in memories
             ]
