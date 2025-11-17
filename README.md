@@ -10,7 +10,13 @@ A production-ready AI agent system with dual-memory architecture (short-term + l
 
 ## ✨ Features
 
-- **Dual-Memory System**: Short-term (30 messages) + Long-term (unlimited persistent facts)
+- **Dual-Memory System**: Short-term (30 messages) + Long-term (unlimited persistent entities)
+- **Phase 1: Intelligent Memory Extraction**
+  - LLM-based entity extraction (GPT-4 powered)
+  - Temporal awareness (past/current/future states)
+  - 7 entity types with confidence scoring (≥ 0.5 threshold)
+  - Reference sentence preservation for context
+  - Rich metadata (confidence, importance, timestamps)
 - **Full-Stack Application**: FastAPI backend + React UI
 - **PostgreSQL Storage**: Reliable persistence with checkpointing
 - **ReAct Agent Pattern**: Reasoning + Acting with tool execution
@@ -103,23 +109,53 @@ Open your browser: `http://localhost:5173`
 - **Scope**: Single session only
 - **Use Case**: Recent conversation context
 
-### Long-Term Memory (Store)
-- **Storage**: ALL triggered facts (unlimited)
+### Long-Term Memory (Store) - Phase 1: Intelligent Extraction
+
+**Phase 1 Implementation (Current)**: LLM-based entity extraction with temporal awareness
+
+- **Storage**: Structured entities with metadata (unlimited)
 - **Persistence**: Forever (until deleted)
 - **Scope**: Cross-session (same user_id)
-- **Use Case**: Persistent facts about users
+- **Extraction**: GPT-4 powered intelligent analysis
 
-**Trigger Phrases for Long-Term Storage:**
-- "My name is..."
-- "I am..."
-- "I like..."
-- "I love..."
-- "I prefer..."
+**Extracted Entity Types:**
+1. `person_name` - User's name or names of people mentioned
+2. `age` - Age information
+3. `profession` - Jobs, careers, occupations
+4. `location` - Cities, countries, addresses
+5. `preference` - Likes, dislikes, hobbies, interests
+6. `fact` - General facts about the user
+7. `relationship` - Family, friends, colleagues
+
+**Temporal Awareness:**
+Each entity includes temporal context:
+- **Past**: `location: Hong Kong (past)` - "I lived in Hong Kong"
+- **Current**: `location: Canada (current)` - "I live in Canada now"
+- **Future**: `profession: doctor (future)` - "I plan to become a doctor"
+
+**Rich Metadata Storage:**
+- Confidence scoring (0.0-1.0) - Only entities with confidence ≥ 0.5 are stored
+- Importance weighting (0.0-1.0) - Prioritizes critical information
+- Reference sentences - Preserves original context
+- Temporal status - Tracks past/current/future states
+- Timestamps - Records when information was captured
+
+**Example:**
+```
+User: "I lived in Hong Kong and moved to Canada now"
+
+Extracted:
+- Entity 1: location: "Hong Kong" (past, confidence: 1.0)
+  Reference: "I lived in Hong Kong"
+
+- Entity 2: location: "Canada" (current, confidence: 1.0)
+  Reference: "moved to Canada now"
+```
 
 **Memory Modes:**
 - **Short-term**: Uses only last 30 messages
-- **Long-term**: Uses only stored facts
-- **Both** (Recommended): Combines recent context + persistent facts
+- **Long-term**: Uses only stored entities
+- **Both** (Recommended): Combines recent context + persistent entities
 
 ---
 
@@ -402,4 +438,4 @@ Built with:
 
 **Built with ❤️ using LangGraph, FastAPI, React, and PostgreSQL**
 
-**Last Updated**: 2025-01-11
+**Last Updated**: 2025-11-16
