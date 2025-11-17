@@ -469,10 +469,6 @@ function ChatInterface() {
     }
   };
 
-  const handleStarterPrompt = (promptText) => {
-    setInput(promptText);
-  };
-
   // Auto-play persona messages
   const playPersonaDemo = async () => {
     if (!selectedPersona || isPlaying) return;
