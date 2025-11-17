@@ -95,6 +95,8 @@ class ExtractedEntity(BaseModel):
     value: str  # The actual value
     confidence: float  # Confidence score 0.0-1.0
     context: Optional[str] = None  # Surrounding context
+    temporal_status: Optional[str] = "current"  # Temporal context: "past", "current", "future", or None
+    reference_sentence: Optional[str] = None  # Original sentence for context preservation
 
 
 class MemoryExtraction(BaseModel):
@@ -151,7 +153,7 @@ async def extract_memories_with_llm(
         context += f"User: {message}\n"
 
         # Prompt for entity extraction
-        extraction_prompt = f"""You are an expert at extracting memorable information from conversations.
+        extraction_prompt = f"""You are an expert at extracting memorable information from conversations with TEMPORAL AWARENESS.
 
 CONVERSATION CONTEXT:
 {context}
@@ -166,6 +168,16 @@ EXTRACT these entity types:
 - preference: Likes, dislikes, preferences (food, hobbies, etc.)
 - fact: General facts about the user
 - relationship: Family members, friends, relationships
+
+TEMPORAL AWARENESS (CRITICAL):
+For each entity, identify the temporal_status:
+- "past": Things that were true but are no longer (e.g., "I lived in Hong Kong", "I used to work at Google")
+- "current": Things that are currently true (e.g., "I live in Canada now", "I am a developer")
+- "future": Future plans or intentions (e.g., "I will move to Japan", "I plan to become a manager")
+- null: Timeless facts (e.g., "My name is John")
+
+REFERENCE SENTENCE:
+Extract the exact or compacted sentence from the conversation that contains this information. This preserves context.
 
 SCORING GUIDELINES:
 - Confidence: 0.0-1.0 (how certain you are about this entity)
@@ -183,13 +195,20 @@ SCORING GUIDELINES:
 RESPONSE FORMAT (JSON):
 {{
   "entities": [
-    {{"type": "person_name", "value": "John", "confidence": 1.0, "context": "User said 'My name is John'"}},
-    {{"type": "profession", "value": "software engineer", "confidence": 0.9, "context": "User works in tech"}}
+    {{"type": "location", "value": "Hong Kong", "confidence": 1.0, "context": "User's past residence", "temporal_status": "past", "reference_sentence": "I lived in Hong Kong"}},
+    {{"type": "location", "value": "Canada", "confidence": 1.0, "context": "User's current residence", "temporal_status": "current", "reference_sentence": "I moved to Canada now"}},
+    {{"type": "person_name", "value": "John", "confidence": 1.0, "context": "User's name", "temporal_status": null, "reference_sentence": "My name is John"}}
   ],
-  "summary": "User is named John and works as a software engineer",
+  "summary": "User lived in Hong Kong (past) and now lives in Canada (current). User's name is John.",
   "importance": 0.95,
   "should_store": true
 }}
+
+EXAMPLE - Temporal extraction:
+User says: "I lived in Hong Kong and moved to Canada now"
+Extract:
+- location: "Hong Kong" (temporal_status: "past", reference_sentence: "I lived in Hong Kong")
+- location: "Canada" (temporal_status: "current", reference_sentence: "moved to Canada now")
 
 If there's NOTHING worth remembering (casual chat, questions, etc.), return:
 {{
@@ -432,16 +451,22 @@ async def chat(request: ChatRequest):
                     if entity.confidence >= 0.5:
                         memory_id = str(uuid.uuid4())
 
-                        # Store with rich metadata
+                        # Store with rich metadata including temporal awareness
+                        # Format data with temporal status if present
+                        temporal_label = f" ({entity.temporal_status})" if entity.temporal_status else ""
+                        data_display = f"{entity.type}: {entity.value}{temporal_label}"
+
                         memory_data = {
-                            "data": f"{entity.type}: {entity.value}",  # Format: "person_name: John"
+                            "data": data_display,  # Format: "location: Hong Kong (past)"
                             "entity_type": entity.type,
                             "entity_value": entity.value,
                             "confidence": entity.confidence,
                             "context": entity.context or extraction.summary,
                             "importance": extraction.importance,
                             "timestamp": str(uuid.uuid1().time),
-                            "original_message": request.message
+                            "original_message": request.message,
+                            "temporal_status": entity.temporal_status,  # past/current/future/null
+                            "reference_sentence": entity.reference_sentence  # Compacted original sentence
                         }
 
                         await global_store.aput(
