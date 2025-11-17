@@ -61,6 +61,9 @@ else:
 print(f"Connecting to database: {DB_URI[:50]}...")
 print(f"DATABASE_URL environment variable present: {bool(raw_database_url)}")
 print(f"Total environment variables loaded: {len(os.environ)}")
+# Debug: print first few env var names (not values for security)
+env_keys = sorted(os.environ.keys())
+print(f"Sample env vars: {', '.join(env_keys[:10])}")
 
 # Memory configuration
 SHORT_TERM_MESSAGE_LIMIT = int(os.getenv("SHORT_TERM_MESSAGE_LIMIT", "30"))
