@@ -330,7 +330,20 @@ function ChatInterface() {
 
         // Check for rate limit error
         if (errorData?.detail?.includes('rate_limit_exceeded') ||
-            errorData?.detail?.includes('Rate limit reached')) {
+            errorData?.detail?.includes('Rate limit reached') ||
+            errorData?.detail?.includes('All API keys have reached their rate limits')) {
+
+          // Check if all keys are exhausted
+          if (errorData?.detail?.includes('All API keys')) {
+            const errorMessage = {
+              role: 'assistant',
+              content: `⏱️ All API Keys Exhausted!\n\nAll available API keys have reached their daily token limits (100,000 tokens each).\n\nThe service will automatically resume when the limits reset (every 24 hours).\n\nTip: Try again later or contact the administrator to add more API keys.`,
+              timestamp: new Date().toISOString(),
+              isError: true,
+            };
+            setMessages((prev) => [...prev, errorMessage]);
+            return;
+          }
 
           // Extract wait time if available
           const waitTimeMatch = errorData.detail.match(/Please try again in ([^.]+)/);

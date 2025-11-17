@@ -28,12 +28,19 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Initialize the LLM
+# API Key Rotation Setup
+# Support multiple comma-separated API keys for automatic rotation
+API_KEYS = [key.strip() for key in os.getenv("OPENAI_API_KEY", "your-api-key-here").split(",")]
+current_api_key_index = 0
+
+print(f"🔑 Loaded {len(API_KEYS)} API key(s) for rotation")
+
+# Initialize the LLM with first key
 llm = init_chat_model(
     model=os.getenv("LLM_MODEL", "openai:gpt-4"),
     temperature=0.7,
     base_url=os.getenv("OPENAI_API_BASE", "https://api.openai.com/v1"),
-    api_key=os.getenv("OPENAI_API_KEY", "your-api-key-here")
+    api_key=API_KEYS[current_api_key_index]
 )
 
 # PostgreSQL connection string
@@ -48,6 +55,44 @@ global_checkpointer = None
 global_agent = None
 global_store_cm = None  # Context manager
 global_checkpointer_cm = None  # Context manager
+
+
+def switch_to_next_api_key():
+    """
+    Switch to the next available API key and reinitialize the agent.
+    Returns True if switched successfully, False if no more keys available.
+    """
+    global current_api_key_index, llm, global_agent
+
+    # Try next key
+    next_index = current_api_key_index + 1
+
+    if next_index >= len(API_KEYS):
+        print(f"❌ All {len(API_KEYS)} API keys exhausted")
+        return False
+
+    current_api_key_index = next_index
+    masked_key = API_KEYS[current_api_key_index][:20] + "..."
+    print(f"🔄 Switching to API key #{current_api_key_index + 1}/{len(API_KEYS)} ({masked_key})")
+
+    # Reinitialize LLM with new key
+    llm = init_chat_model(
+        model=os.getenv("LLM_MODEL", "openai:gpt-4"),
+        temperature=0.7,
+        base_url=os.getenv("OPENAI_API_BASE", "https://api.openai.com/v1"),
+        api_key=API_KEYS[current_api_key_index]
+    )
+
+    # Reinitialize agent with new LLM
+    global_agent = create_react_agent(
+        llm,
+        tools=[book_hotel],
+        checkpointer=global_checkpointer,
+        store=global_store
+    )
+
+    print(f"✅ Successfully switched to key #{current_api_key_index + 1}")
+    return True
 
 
 # Define tools
@@ -444,11 +489,50 @@ async def chat(request: ChatRequest):
         # Add current user message
         message_history.append(HumanMessage(content=augmented_input))
 
-        # Invoke the agent
-        agent_response = await global_agent.ainvoke(
-            {"messages": message_history},
-            config
-        )
+        # Invoke the agent with automatic API key rotation on rate limits
+        max_retries = len(API_KEYS)
+        agent_response = None
+        last_error = None
+
+        for attempt in range(max_retries):
+            try:
+                agent_response = await global_agent.ainvoke(
+                    {"messages": message_history},
+                    config
+                )
+                break  # Success - exit retry loop
+
+            except Exception as e:
+                error_str = str(e)
+                last_error = e
+
+                # Check if it's a rate limit error
+                if "rate_limit_exceeded" in error_str.lower() or "rate limit reached" in error_str.lower():
+                    print(f"⚠️ Rate limit hit on API key #{current_api_key_index + 1}")
+
+                    # Try to switch to next key
+                    if attempt < max_retries - 1:  # Not the last attempt
+                        if switch_to_next_api_key():
+                            print(f"🔁 Retrying with next API key (attempt {attempt + 2}/{max_retries})...")
+                            continue  # Retry with new key
+                        else:
+                            # No more keys available
+                            raise HTTPException(
+                                status_code=429,
+                                detail="All API keys have reached their rate limits. Please try again later."
+                            )
+                    else:
+                        # Last attempt failed
+                        raise HTTPException(
+                            status_code=429,
+                            detail="All API keys have reached their rate limits. Please try again later."
+                        )
+                else:
+                    # Not a rate limit error, re-raise immediately
+                    raise
+
+        if agent_response is None:
+            raise last_error or Exception("Agent invocation failed")
 
         # Extract the response
         response_content = agent_response["messages"][-1].content
