@@ -336,12 +336,9 @@ function ChatInterface() {
           const waitTimeMatch = errorData.detail.match(/Please try again in ([^.]+)/);
           const waitTime = waitTimeMatch ? waitTimeMatch[1] : 'a few minutes';
 
-          // Show user-friendly alert
-          alert(`⏱️ Daily usage limit reached!\n\nThe AI service has reached its daily token limit. Please try again in ${waitTime}.\n\nTip: The service resets every 24 hours.`);
-
           const errorMessage = {
             role: 'assistant',
-            content: `I've reached my daily usage limit. Please try again in ${waitTime}. The service resets every 24 hours.`,
+            content: `⏱️ Daily token limit reached! The AI service has used up its daily allocation of tokens (100,000 tokens/day). Please try again in ${waitTime}.\n\nNote: This is different from the 60 requests/minute limit. Token limits depend on the length of conversations.`,
             timestamp: new Date().toISOString(),
             isError: true,
           };
@@ -374,12 +371,9 @@ function ChatInterface() {
     } catch (error) {
       console.error('Error sending message:', error);
 
-      // Show user-friendly alert
-      alert('❌ Connection Error\n\nCould not connect to the AI service. Please check:\n\n1. Backend server is running\n2. Internet connection is stable\n3. Try refreshing the page');
-
       const errorMessage = {
         role: 'assistant',
-        content: 'Sorry, I encountered a connection error. Please make sure the backend server is running and try again.',
+        content: '❌ Connection Error\n\nCould not connect to the AI service. Please check:\n\n1. Backend server is running\n2. Internet connection is stable\n3. Try refreshing the page',
         timestamp: new Date().toISOString(),
         isError: true,
       };
