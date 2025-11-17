@@ -99,6 +99,7 @@ function ChatInterface() {
 
   const userId = activeSessionId;
   const messagesEndRef = useRef(null);
+  const inputRef = useRef(null);
 
   // STEP 3: Persist sessions to localStorage whenever they change
   useEffect(() => {
@@ -285,6 +286,9 @@ function ChatInterface() {
     setMessages((prev) => [...prev, userMessage]);
     setInput('');
     setLoading(true);
+
+    // Refocus input after clearing for better UX
+    setTimeout(() => inputRef.current?.focus(), 0);
 
     try {
       const response = await fetch(`${API_URL}/chat/v2`, {
@@ -798,7 +802,7 @@ function ChatInterface() {
                   className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} animate-slide-up`}
                 >
                   <div
-                    className={`max-w-[80%] rounded-2xl p-6 ${
+                    className={`max-w-[75%] rounded-lg p-3 ${
                       message.role === 'user'
                         ? 'ml-auto'
                         : ''
@@ -811,7 +815,7 @@ function ChatInterface() {
                       borderColor: message.role === 'user' ? colors.primary : colors.border
                     }}
                   >
-                    <div className="flex items-center gap-2 mb-3">
+                    <div className="flex items-center gap-2 mb-1.5">
                       <span className={`text-xs font-semibold opacity-70 uppercase tracking-wide`}>
                         {message.role === 'user' ? 'You' : 'Assistant'}
                       </span>
@@ -833,8 +837,8 @@ function ChatInterface() {
                     </div>
 
                     {message.facts_extracted && message.facts_extracted.length > 0 && (
-                      <div className="mt-5 p-4 rounded-xl" style={{ backgroundColor: message.role === 'user' ? 'rgba(255,255,255,0.2)' : '#e8f5e9' }}>
-                        <div className="flex items-center gap-2 mb-3">
+                      <div className="mt-3 p-2.5 rounded-lg" style={{ backgroundColor: message.role === 'user' ? 'rgba(255,255,255,0.2)' : '#e8f5e9' }}>
+                        <div className="flex items-center gap-2 mb-2">
                           <svg className={`w-4 h-4`} style={{ color: message.role === 'user' ? 'white' : colors.primary }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                           </svg>
@@ -940,6 +944,7 @@ function ChatInterface() {
           <form onSubmit={sendMessage} className="max-w-4xl mx-auto">
             <div className="flex gap-4">
               <input
+                ref={inputRef}
                 type="text"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
