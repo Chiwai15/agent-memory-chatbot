@@ -338,7 +338,7 @@ function ChatInterface() {
 
           const errorMessage = {
             role: 'assistant',
-            content: `⏱️ Daily token limit reached! The AI service has used up its daily allocation of tokens (100,000 tokens/day). Please try again in ${waitTime}.\n\nNote: This is different from the 60 requests/minute limit. Token limits depend on the length of conversations.`,
+            content: `⏱️ Daily token limit reached!\n\nThe AI service has used up its daily allocation of 100,000 tokens. Please try again in ${waitTime}.\n\nNote: Tokens are consumed by both your messages and my responses. Long conversations with memory retrieval use more tokens.`,
             timestamp: new Date().toISOString(),
             isError: true,
           };
