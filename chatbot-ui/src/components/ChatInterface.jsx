@@ -823,9 +823,6 @@ function ChatInterface() {
                       <span className={`text-xs font-semibold opacity-70 uppercase tracking-wide`}>
                         {message.role === 'user' ? 'You' : 'Assistant'}
                       </span>
-                      <span className={`text-xs opacity-50`}>
-                        {message.timestamp ? new Date(message.timestamp).toLocaleTimeString() : ''}
-                      </span>
                     </div>
                     <div className="text-sm leading-relaxed whitespace-pre-wrap">
                       {message.isTyping ? (
@@ -839,6 +836,14 @@ function ChatInterface() {
                         message.content.split('[STORED MEMORIES')[0].trim()
                       )}
                     </div>
+                    {/* WhatsApp-style timestamp at bottom right */}
+                    {message.timestamp && !message.isTyping && (
+                      <div className="flex justify-end mt-1">
+                        <span className={`text-xs opacity-50`}>
+                          {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      </div>
+                    )}
 
                     {message.facts_extracted && message.facts_extracted.length > 0 && (
                       <div className="mt-3 p-2.5 rounded-lg" style={{ backgroundColor: message.role === 'user' ? 'rgba(255,255,255,0.2)' : '#e8f5e9' }}>
