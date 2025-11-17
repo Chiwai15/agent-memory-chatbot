@@ -88,6 +88,23 @@ class ChatResponse(BaseModel):
     quality_score: Optional[float] = 0.0
 
 
+# Phase 1: LLM-based Entity Extraction Models
+class ExtractedEntity(BaseModel):
+    """Represents a single extracted entity from conversation"""
+    type: str  # Entity type: person_name, age, profession, location, preference, fact, relationship
+    value: str  # The actual value
+    confidence: float  # Confidence score 0.0-1.0
+    context: Optional[str] = None  # Surrounding context
+
+
+class MemoryExtraction(BaseModel):
+    """Result of LLM-based memory extraction from conversation"""
+    entities: List[ExtractedEntity]
+    summary: str  # One-sentence summary of what to remember
+    importance: float  # Importance score 0.0-1.0
+    should_store: bool = True  # Whether this should be stored in long-term memory
+
+
 def pre_model_hook(state):
     """
     Pre-processing hook called before each LLM invocation.
@@ -103,6 +120,128 @@ def pre_model_hook(state):
         allow_partial=False,
     )
     return {"llm_input_messages": trimmed_messages}
+
+
+# Phase 1: LLM-based Memory Extraction Function
+async def extract_memories_with_llm(
+    message: str,
+    conversation_history: List[Dict[str, str]],
+    user_id: str
+) -> Optional[MemoryExtraction]:
+    """
+    Use LLM to extract entities and facts from conversation.
+
+    This replaces the naive keyword-based approach with intelligent extraction
+    that understands context, intent, and relationships.
+
+    Args:
+        message: The current user message
+        conversation_history: Recent conversation context
+        user_id: User identifier for context
+
+    Returns:
+        MemoryExtraction object with entities, summary, and importance score
+    """
+    try:
+        # Build conversation context (last 5 messages for efficiency)
+        context = ""
+        for msg in conversation_history[-5:]:
+            role = "User" if msg.get("role") == "user" else "Assistant"
+            context += f"{role}: {msg.get('content', '')}\n"
+        context += f"User: {message}\n"
+
+        # Prompt for entity extraction
+        extraction_prompt = f"""You are an expert at extracting memorable information from conversations.
+
+CONVERSATION CONTEXT:
+{context}
+
+TASK: Analyze the user's latest message and determine if it contains information worth remembering long-term.
+
+EXTRACT these entity types:
+- person_name: User's name or names of people mentioned
+- age: User's age or ages mentioned
+- profession: Jobs, careers, occupations
+- location: Cities, countries, addresses
+- preference: Likes, dislikes, preferences (food, hobbies, etc.)
+- fact: General facts about the user
+- relationship: Family members, friends, relationships
+
+SCORING GUIDELINES:
+- Confidence: 0.0-1.0 (how certain you are about this entity)
+  * 1.0: Explicit statements ("My name is John")
+  * 0.7-0.9: Strong context ("I'm a software engineer")
+  * 0.5-0.6: Implied information ("I work in tech")
+  * <0.5: Weak/uncertain information
+
+- Importance: 0.0-1.0 (how important is this to remember)
+  * 1.0: Core identity (name, age, profession)
+  * 0.7-0.9: Significant preferences/facts
+  * 0.5-0.6: Minor preferences
+  * <0.5: Casual mentions
+
+RESPONSE FORMAT (JSON):
+{{
+  "entities": [
+    {{"type": "person_name", "value": "John", "confidence": 1.0, "context": "User said 'My name is John'"}},
+    {{"type": "profession", "value": "software engineer", "confidence": 0.9, "context": "User works in tech"}}
+  ],
+  "summary": "User is named John and works as a software engineer",
+  "importance": 0.95,
+  "should_store": true
+}}
+
+If there's NOTHING worth remembering (casual chat, questions, etc.), return:
+{{
+  "entities": [],
+  "summary": "No memorable information",
+  "importance": 0.0,
+  "should_store": false
+}}
+
+Analyze the conversation and respond with ONLY valid JSON:"""
+
+        # Use the LLM with structured output
+        response = await llm.ainvoke([
+            SystemMessage(content="You are a memory extraction expert. Respond ONLY with valid JSON matching the MemoryExtraction schema."),
+            HumanMessage(content=extraction_prompt)
+        ])
+
+        # Parse the response
+        import json
+        try:
+            # Clean the response (remove markdown code blocks if present)
+            content = response.content.strip()
+            if content.startswith("```"):
+                # Remove markdown code blocks
+                content = content.split("```")[1]
+                if content.startswith("json"):
+                    content = content[4:].strip()
+
+            # Parse JSON
+            extracted_data = json.loads(content)
+
+            # Convert to Pydantic model
+            entities = [
+                ExtractedEntity(**entity)
+                for entity in extracted_data.get("entities", [])
+            ]
+
+            return MemoryExtraction(
+                entities=entities,
+                summary=extracted_data.get("summary", ""),
+                importance=extracted_data.get("importance", 0.0),
+                should_store=extracted_data.get("should_store", True)
+            )
+
+        except json.JSONDecodeError as e:
+            print(f"⚠️ Failed to parse LLM response as JSON: {e}")
+            print(f"Response was: {response.content[:200]}")
+            return None
+
+    except Exception as e:
+        print(f"⚠️ Error in extract_memories_with_llm: {e}")
+        return None
 
 
 @app.on_event("startup")
@@ -262,26 +401,67 @@ async def chat(request: ChatRequest):
         # Extract the response
         response_content = agent_response["messages"][-1].content
 
-        # Extract facts from the conversation (simple heuristic)
-        # In a production system, you might use an LLM to extract facts
+        # Phase 1: LLM-based Memory Extraction
         facts_extracted = []
-        if "my name is" in request.message.lower():
-            facts_extracted.append(f"User's name mentioned")
-        if "i like" in request.message.lower() or "i love" in request.message.lower():
-            facts_extracted.append(f"User preference noted")
 
-        # Store new memories in long-term storage if appropriate
-        # This is a simple heuristic - in production, you'd use more sophisticated logic
+        # Use LLM to intelligently extract memories from conversation
         if normalized_source in ["long", "both"]:
-            if any(phrase in request.message.lower() for phrase in ["my name is", "i am", "i like", "i love", "i prefer"]):
+            # Build conversation context from request messages
+            conv_history = [
+                {"role": msg.role, "content": msg.content}
+                for msg in request.messages[-5:]  # Last 5 messages for context
+            ]
+
+            # Extract memories using LLM
+            extraction = await extract_memories_with_llm(
+                message=request.message,
+                conversation_history=conv_history,
+                user_id=request.user_id
+            )
+
+            # Store extracted memories if they should be stored
+            if extraction and extraction.should_store and extraction.entities:
                 namespace = ("memories", request.user_id)
-                memory_id = str(uuid.uuid4())
-                await global_store.aput(
-                    namespace,
-                    memory_id,
-                    {"data": request.message, "timestamp": str(uuid.uuid1().time)}
-                )
-                facts_extracted.append("New memory stored")
+
+                print(f"🧠 Extracted {len(extraction.entities)} entities (importance: {extraction.importance:.2f})")
+                print(f"📝 Summary: {extraction.summary}")
+
+                # Store each entity with metadata
+                for entity in extraction.entities:
+                    # Only store entities with confidence > 0.5
+                    if entity.confidence >= 0.5:
+                        memory_id = str(uuid.uuid4())
+
+                        # Store with rich metadata
+                        memory_data = {
+                            "data": f"{entity.type}: {entity.value}",  # Format: "person_name: John"
+                            "entity_type": entity.type,
+                            "entity_value": entity.value,
+                            "confidence": entity.confidence,
+                            "context": entity.context or extraction.summary,
+                            "importance": extraction.importance,
+                            "timestamp": str(uuid.uuid1().time),
+                            "original_message": request.message
+                        }
+
+                        await global_store.aput(
+                            namespace,
+                            memory_id,
+                            memory_data
+                        )
+
+                        facts_extracted.append(
+                            f"{entity.type}: {entity.value} (confidence: {entity.confidence:.2f})"
+                        )
+
+                        print(f"✅ Stored: {entity.type}={entity.value} (confidence: {entity.confidence:.2f})")
+
+                if facts_extracted:
+                    facts_extracted.insert(0, f"[LLM Extraction] {extraction.summary}")
+            else:
+                print(f"ℹ️ No memorable information to store")
+                if extraction:
+                    print(f"   Reason: should_store={extraction.should_store}, entities={len(extraction.entities)}, importance={extraction.importance:.2f}")
 
         return ChatResponse(
             response=response_content,
