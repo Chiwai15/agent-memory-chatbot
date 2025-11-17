@@ -415,8 +415,8 @@ function ChatInterface() {
     const isLastSession = sessions.length === 1;
 
     const confirmMessage = isLastSession
-      ? 'Clear all memories for this session? The session will remain but all data will be deleted from PostgreSQL (both short-term and long-term).'
-      : 'Delete this session? All memories for this user will be removed from PostgreSQL (both short-term and long-term).';
+      ? 'Clear all memories for this session? The session will remain but all conversation history and saved facts will be deleted.'
+      : 'Delete this session? All conversation history and saved facts for this user will be removed.';
 
     if (confirm(confirmMessage)) {
       try {
@@ -976,7 +976,6 @@ function ChatInterface() {
           <h2 className="text-base sm:text-lg font-bold" style={{ color: colors.text }}>Memory Pensieve ⛲️</h2>
           <p className="text-xs mt-1" style={{ color: colors.textLight }}>Mode: {memorySource === 'short' ? 'Short-term only' : memorySource === 'long' ? 'Long-term only' : 'Both'}</p>
           <p className="text-xs mt-1" style={{ color: colors.textLight }}>User ID: {userId}</p>
-          <p className="text-xs mt-1 font-mono" style={{ color: colors.textLight }}>Storage: PostgreSQL</p>
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
@@ -1063,9 +1062,6 @@ function ChatInterface() {
 
                         <div className="rounded-lg p-3" style={{ backgroundColor: colors.hover }}>
                           <div className="flex items-center gap-2 text-xs">
-                            <span className="px-2 py-1 rounded font-mono" style={{ backgroundColor: colors.surface, color: colors.text }}>
-                              PostgreSQL
-                            </span>
                             <span className="px-2 py-1 rounded" style={{ backgroundColor: colors.surface, color: colors.text }}>
                               Checkpoints
                             </span>
@@ -1097,9 +1093,6 @@ function ChatInterface() {
                                   </p>
                                 )}
                                 <div className="flex items-center gap-2 text-xs">
-                                  <span className="px-2 py-1 rounded font-mono" style={{ backgroundColor: colors.hover, color: colors.text }}>
-                                    PostgreSQL
-                                  </span>
                                   <span className="px-2 py-1 rounded" style={{ backgroundColor: colors.hover, color: colors.text }}>
                                     Store
                                   </span>
