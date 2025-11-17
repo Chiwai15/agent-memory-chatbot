@@ -694,7 +694,7 @@ function ChatInterface() {
             <h2 className="text-sm font-semibold uppercase tracking-wider" style={{ color: colors.text }}>Sessions</h2>
             <button
               onClick={createNewSession}
-              className="w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center transition-all duration-300 hover:scale-105"
+              className="w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center transition-all duration-200 hover:scale-110 active:scale-95 hover:shadow-lg"
               style={{ backgroundColor: colors.primary }}
             >
               <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -708,7 +708,7 @@ function ChatInterface() {
               <div
                 key={session.id}
                 onClick={() => switchSession(session.id)}
-                className="group relative rounded-xl p-3 cursor-pointer transition-all duration-300"
+                className="group relative rounded-xl p-3 cursor-pointer transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] hover:shadow-md"
                 style={{
                   backgroundColor: colors.surface,
                   borderWidth: '1px',
@@ -733,7 +733,7 @@ function ChatInterface() {
                       e.preventDefault();
                       deleteSession(session.id);
                     }}
-                    className="w-7 h-7 rounded-lg flex items-center justify-center transition-all duration-200 hover:scale-110 hover:opacity-70 cursor-pointer"
+                    className="w-7 h-7 rounded-lg flex items-center justify-center transition-all duration-200 hover:scale-110 active:scale-90 hover:opacity-100 hover:shadow-sm cursor-pointer"
                     style={{
                       backgroundColor: colors.hover,
                       opacity: 0.6
@@ -751,7 +751,7 @@ function ChatInterface() {
 
           <button
             onClick={clearChat}
-            className="mt-4 w-full py-3 px-4 rounded-xl text-sm font-medium transition-all duration-300 flex items-center justify-center gap-2 flex-shrink-0"
+            className="mt-4 w-full py-3 px-4 rounded-xl text-sm font-medium transition-all duration-200 flex items-center justify-center gap-2 flex-shrink-0 hover:scale-[1.02] active:scale-[0.98] hover:shadow-md"
             style={{ backgroundColor: colors.surface, borderWidth: '1px', borderStyle: 'solid', borderColor: colors.border, color: colors.text }}
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -783,7 +783,7 @@ function ChatInterface() {
                   <button
                     key={index}
                     onClick={() => handleStarterPrompt(prompt.text)}
-                    className="group p-5 2xl:p-7 rounded-2xl transition-all duration-300 hover:scale-105 text-left flex 2xl:flex-col items-center 2xl:items-start gap-4 2xl:gap-0"
+                    className="group p-5 2xl:p-7 rounded-2xl transition-all duration-200 hover:scale-105 active:scale-95 hover:shadow-lg text-left flex 2xl:flex-col items-center 2xl:items-start gap-4 2xl:gap-0"
                     style={{ backgroundColor: colors.surface, borderWidth: '1px', borderStyle: 'solid', borderColor: colors.border }}
                   >
                     <div className="w-10 h-10 2xl:w-14 2xl:h-14 rounded-xl 2xl:rounded-2xl flex items-center justify-center flex-shrink-0 2xl:mb-5 group-hover:scale-110 transition-transform duration-300" style={{ backgroundColor: colors.hover }}>
@@ -900,7 +900,7 @@ function ChatInterface() {
               <div className="flex gap-3">
                 <button
                   onClick={() => setMemorySource('short')}
-                  className="px-3 py-1.5 rounded-xl text-xs font-medium transition-all duration-300"
+                  className="px-3 py-1.5 rounded-xl text-xs font-medium transition-all duration-200 hover:scale-105 active:scale-95"
                   style={{
                     backgroundColor: memorySource === 'short' ? colors.primary : colors.surface,
                     color: memorySource === 'short' ? 'white' : colors.text,
@@ -913,7 +913,7 @@ function ChatInterface() {
                 </button>
                 <button
                   onClick={() => setMemorySource('long')}
-                  className="px-3 py-1.5 rounded-xl text-xs font-medium transition-all duration-300"
+                  className="px-3 py-1.5 rounded-xl text-xs font-medium transition-all duration-200 hover:scale-105 active:scale-95"
                   style={{
                     backgroundColor: memorySource === 'long' ? colors.secondary : colors.surface,
                     color: memorySource === 'long' ? 'white' : colors.text,
@@ -926,7 +926,7 @@ function ChatInterface() {
                 </button>
                 <button
                   onClick={() => setMemorySource('both')}
-                  className="px-3 py-1.5 rounded-xl text-xs font-medium transition-all duration-300"
+                  className="px-3 py-1.5 rounded-xl text-xs font-medium transition-all duration-200 hover:scale-105 active:scale-95"
                   style={{
                     backgroundColor: memorySource === 'both' ? colors.primary : colors.surface,
                     color: memorySource === 'both' ? 'white' : colors.text,
@@ -963,7 +963,7 @@ function ChatInterface() {
               <button
                 type="submit"
                 disabled={loading || !input.trim()}
-                className="px-4 sm:px-5 py-2 sm:py-3 rounded-xl sm:rounded-2xl disabled:opacity-50 disabled:cursor-not-allowed font-medium transition-all duration-300 hover:scale-105 flex items-center gap-2"
+                className="px-4 sm:px-5 py-2 sm:py-3 rounded-xl sm:rounded-2xl disabled:opacity-50 disabled:cursor-not-allowed font-medium transition-all duration-200 hover:scale-105 active:scale-95 hover:shadow-lg flex items-center gap-2"
                 style={{ backgroundColor: colors.primary, color: 'white' }}
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1005,7 +1005,7 @@ function ChatInterface() {
                 <div className="flex gap-2 p-1 rounded-lg" style={{ backgroundColor: colors.hover }}>
                   <button
                     onClick={() => setPenseiveView('short')}
-                    className="flex-1 py-2 px-3 rounded-md text-xs font-medium transition-all"
+                    className="flex-1 py-2 px-3 rounded-md text-xs font-medium transition-all duration-200 hover:scale-105 active:scale-95"
                     style={{
                       backgroundColor: penseiveView === 'short' ? colors.primary : 'transparent',
                       color: penseiveView === 'short' ? 'white' : colors.text
@@ -1015,7 +1015,7 @@ function ChatInterface() {
                   </button>
                   <button
                     onClick={() => setPenseiveView('long')}
-                    className="flex-1 py-2 px-3 rounded-md text-xs font-medium transition-all"
+                    className="flex-1 py-2 px-3 rounded-md text-xs font-medium transition-all duration-200 hover:scale-105 active:scale-95"
                     style={{
                       backgroundColor: penseiveView === 'long' ? colors.primary : 'transparent',
                       color: penseiveView === 'long' ? 'white' : colors.text
@@ -1142,7 +1142,7 @@ function ChatInterface() {
           <button
             onClick={fetchDebugData}
             disabled={debugLoading}
-            className="w-full py-3 sm:py-4 px-4 sm:px-5 rounded-xl sm:rounded-2xl disabled:opacity-50 font-medium transition-all duration-300 flex items-center justify-center gap-2"
+            className="w-full py-3 sm:py-4 px-4 sm:px-5 rounded-xl sm:rounded-2xl disabled:opacity-50 font-medium transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] hover:shadow-lg flex items-center justify-center gap-2"
             style={{ backgroundColor: colors.primary, color: 'white' }}
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
