@@ -6,7 +6,6 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from langchain_core.tools import tool
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.prebuilt import create_react_agent
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage, trim_messages
@@ -86,28 +85,13 @@ def switch_to_next_api_key():
     # Reinitialize agent with new LLM
     global_agent = create_react_agent(
         llm,
-        tools=[book_hotel],
+        tools=[],
         checkpointer=global_checkpointer,
         store=global_store
     )
 
     print(f"✅ Successfully switched to key #{current_api_key_index + 1}")
     return True
-
-
-# Define tools
-@tool("book_hotel", description="Book a hotel reservation")
-def book_hotel(hotel_name: str):
-    """
-    Simulates booking a hotel reservation.
-
-    Args:
-        hotel_name: Name of the hotel to book
-
-    Returns:
-        Confirmation message with booking details
-    """
-    return f"Successfully booked accommodation at {hotel_name}."
 
 
 # Pydantic models
@@ -344,9 +328,6 @@ async def startup_event():
     await global_store.setup()
     await global_checkpointer.setup()
 
-    # Define tools
-    tools = [book_hotel]
-
     # System message
     system_message = SystemMessage(content=(
         "You are a helpful AI assistant with dual-memory architecture.\n\n"
@@ -376,7 +357,7 @@ async def startup_event():
     # Create the agent
     global_agent = create_react_agent(
         model=llm,
-        tools=tools,
+        tools=[],
         prompt=system_message,
         pre_model_hook=pre_model_hook,
         checkpointer=global_checkpointer,
