@@ -1119,14 +1119,11 @@ async def chat(request: ChatRequest):
                 f"[STORED MEMORIES from previous conversations:\n{memories_context}\n"
                 f"Use these memories to answer the user's question if relevant.]"
             )
-            print(
-                f"🧠 Retrieved {
-                    len(retrieved_memories)} memories for user {
-                    request.user_id}")
-            print(f"📝 Memory context: {memories_context[:200]}...")
+            print(f"Retrieved {len(retrieved_memories)} memories for user {request.user_id}")
+            print(f"Memory context: {memories_context[:200]}...")
         else:
             augmented_input = request.message
-            print(f"ℹ️ No stored memories found for user {request.user_id}")
+            print(f"No stored memories found for user {request.user_id}")
 
         # Build message history from request based on memory_source
         message_history = []
@@ -1167,16 +1164,12 @@ async def chat(request: ChatRequest):
                 # Check if it's a rate limit error
                 if "rate_limit_exceeded" in error_str.lower(
                 ) or "rate limit reached" in error_str.lower():
-                    print(
-                        f"⚠️ Rate limit hit on API key #{
-                            current_api_key_index + 1}")
+                    print(f"Rate limit hit on API key #{current_api_key_index + 1}")
 
                     # Try to switch to next key
                     if attempt < max_retries - 1:  # Not the last attempt
                         if switch_to_next_api_key():
-                            print(
-                                f"🔁 Retrying with next API key (attempt {
-                                    attempt + 2}/{max_retries})...")
+                            print(f"Retrying with next API key (attempt {attempt + 2}/{max_retries})...")
                             continue  # Retry with new key
                         else:
                             # No more keys available
@@ -1220,12 +1213,8 @@ async def chat(request: ChatRequest):
             if extraction and extraction.should_store and extraction.entities:
                 namespace = ("memories", request.user_id)
 
-                print(
-                    f"🧠 Extracted {
-                        len(
-                            extraction.entities)} entities (importance: {
-                        extraction.importance:.2f})")
-                print(f"📝 Summary: {extraction.summary}")
+                print(f"Extracted {len(extraction.entities)} entities (importance: {extraction.importance:.2f})")
+                print(f"Summary: {extraction.summary}")
 
                 # Store each entity with metadata
                 for entity in extraction.entities:
@@ -1235,11 +1224,8 @@ async def chat(request: ChatRequest):
 
                         # Store with rich metadata including temporal awareness
                         # Format data with temporal status if present
-                        temporal_label = f" ({
-                            entity.temporal_status})" if entity.temporal_status else ""
-                        data_display = f"{
-                            entity.type}: {
-                            entity.value}{temporal_label}"
+                        temporal_label = f" ({entity.temporal_status})" if entity.temporal_status else ""
+                        data_display = f"{entity.type}: {entity.value}{temporal_label}"
 
                         memory_data = {
                             # Format: "location: Hong Kong (past)"
@@ -1265,25 +1251,14 @@ async def chat(request: ChatRequest):
                             f"{entity.type}: {entity.value} (confidence: {entity.confidence:.2f})"
                         )
 
-                        print(
-                            f"✅ Stored: {
-                                entity.type}={
-                                entity.value} (confidence: {
-                                entity.confidence:.2f})")
+                        print(f"Stored: {entity.type}={entity.value} (confidence: {entity.confidence:.2f})")
 
                 if facts_extracted:
-                    facts_extracted.insert(
-                        0, f"[LLM Extraction] {
-                            extraction.summary}")
+                    facts_extracted.insert(0, f"[LLM Extraction] {extraction.summary}")
             else:
-                print(f"ℹ️ No memorable information to store")
+                print(f"No memorable information to store")
                 if extraction:
-                    print(
-                        f"   Reason: should_store={
-                            extraction.should_store}, entities={
-                            len(
-                                extraction.entities)}, importance={
-                            extraction.importance:.2f}")
+                    print(f"   Reason: should_store={extraction.should_store}, entities={len(extraction.entities)}, importance={extraction.importance:.2f}")
 
         return ChatResponse(
             response=response_content,
