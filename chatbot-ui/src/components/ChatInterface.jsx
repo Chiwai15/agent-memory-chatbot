@@ -976,6 +976,11 @@ function ChatInterface() {
           <h2 className="text-base sm:text-lg font-bold" style={{ color: colors.text }}>Memory Pensieve ⛲️</h2>
           <p className="text-xs mt-1" style={{ color: colors.textLight }}>Mode: {memorySource === 'short' ? 'Short-term only' : memorySource === 'long' ? 'Long-term only' : 'Both'}</p>
           <p className="text-xs mt-1" style={{ color: colors.textLight }}>User ID: {userId}</p>
+          <div className="mt-3 p-2 rounded-lg" style={{ backgroundColor: colors.hover }}>
+            <p className="text-xs" style={{ color: colors.text }}>
+              💡 Conversation compacting happens every 30 messages for long-term memory
+            </p>
+          </div>
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
