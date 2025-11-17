@@ -375,11 +375,25 @@ async def chat(request: ChatRequest):
             memories = await global_store.asearch(namespace, query="")
 
             if memories:
+                # Build memory entries with reference sentences for richer context
+                memory_entries = []
+                for d in memories:
+                    entity_label = d.value.get("data", "")
+                    reference = d.value.get("reference_sentence", "")
+
+                    # Format: "entity_label [Reference: 'original sentence']"
+                    if reference:
+                        memory_entry = f"{entity_label} [Reference: '{reference}']"
+                    else:
+                        memory_entry = entity_label
+
+                    memory_entries.append(memory_entry)
+
                 retrieved_memories = [
                     {"text": d.value.get("data", ""), "metadata": d.value}
                     for d in memories
                 ]
-                memories_context = " ".join([d.value.get("data", "") for d in memories])
+                memories_context = " ".join(memory_entries)
 
         # Augment user input with long-term memory context
         if memories_context:

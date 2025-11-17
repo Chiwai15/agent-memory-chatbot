@@ -1079,7 +1079,12 @@ function ChatInterface() {
                           <div className="space-y-3">
                             {debugData.longTerm.memories.map((memory, idx) => (
                               <div key={idx} className="rounded-xl p-4" style={{ backgroundColor: colors.surface, borderWidth: '1px', borderStyle: 'solid', borderColor: colors.border }}>
-                                <p className="text-xs mb-3" style={{ color: colors.text }}>{memory.text}</p>
+                                <p className="text-xs mb-2 font-semibold" style={{ color: colors.text }}>{memory.text}</p>
+                                {memory.metadata && memory.metadata.reference_sentence && (
+                                  <p className="text-xs mb-3 italic" style={{ color: colors.textLight, opacity: 0.85 }}>
+                                    Reference: "{memory.metadata.reference_sentence}"
+                                  </p>
+                                )}
                                 <div className="flex items-center gap-2 text-xs">
                                   <span className="px-2 py-1 rounded font-mono" style={{ backgroundColor: colors.hover, color: colors.text }}>
                                     PostgreSQL
