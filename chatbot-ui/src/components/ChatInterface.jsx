@@ -727,12 +727,12 @@ function ChatInterface() {
             </button>
           </div>
 
-          <div className="space-y-2 flex-1 overflow-y-auto pr-2 min-h-0" style={{ maxHeight: '420px' }}>
+          <div className="space-y-2 flex-1 overflow-y-auto overflow-x-visible pr-2 min-h-0 px-1" style={{ maxHeight: '420px' }}>
             {sessions.map((session) => (
               <div
                 key={session.id}
                 onClick={() => switchSession(session.id)}
-                className="group relative rounded-xl p-3 cursor-pointer transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] hover:shadow-md"
+                className="group relative rounded-xl p-3 cursor-pointer transition-all duration-200 hover:scale-[1.01] active:scale-[0.99] hover:shadow-md"
                 style={{
                   backgroundColor: colors.surface,
                   borderWidth: '1px',
