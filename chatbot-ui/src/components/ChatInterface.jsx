@@ -275,7 +275,17 @@ function ChatInterface() {
 
   const sendMessage = async (e) => {
     e.preventDefault();
-    if (!input.trim() || loading) return;
+
+    // Show feedback instead of silently returning
+    if (!input.trim()) {
+      alert('Please enter a message first');
+      return;
+    }
+
+    if (loading) {
+      alert('Please wait for the current message to complete');
+      return;
+    }
 
     const userMessage = {
       role: 'user',
@@ -620,9 +630,14 @@ function ChatInterface() {
 
             <select
               value={selectedPersona}
-              onChange={(e) => setSelectedPersona(e.target.value)}
-              disabled={isPlaying}
-              className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
+              onChange={(e) => {
+                if (isPlaying) {
+                  alert('Cannot change persona while demo is playing');
+                  return;
+                }
+                setSelectedPersona(e.target.value);
+              }}
+              className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 hover:scale-105"
               style={{
                 backgroundColor: colors.surface,
                 color: colors.text,
@@ -638,9 +653,18 @@ function ChatInterface() {
             </select>
 
             <button
-              onClick={playPersonaDemo}
-              disabled={!selectedPersona || isPlaying}
-              className="px-4 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              onClick={() => {
+                if (!selectedPersona) {
+                  alert('Please select a demo persona first');
+                  return;
+                }
+                if (isPlaying) {
+                  alert('Demo is already playing. Please wait for it to finish.');
+                  return;
+                }
+                playPersonaDemo();
+              }}
+              className="px-4 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 hover:scale-105 active:scale-95 flex items-center gap-2"
               style={{
                 backgroundColor: isPlaying ? colors.secondary : colors.surface,
                 color: isPlaying ? 'white' : colors.text,
@@ -962,8 +986,7 @@ function ChatInterface() {
               />
               <button
                 type="submit"
-                disabled={loading || !input.trim()}
-                className="px-4 sm:px-5 py-2 sm:py-3 rounded-xl sm:rounded-2xl disabled:opacity-50 disabled:cursor-not-allowed font-medium transition-all duration-200 hover:scale-105 active:scale-95 hover:shadow-lg flex items-center gap-2"
+                className="px-4 sm:px-5 py-2 sm:py-3 rounded-xl sm:rounded-2xl font-medium transition-all duration-200 hover:scale-105 active:scale-95 hover:shadow-lg flex items-center gap-2"
                 style={{ backgroundColor: colors.primary, color: 'white' }}
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
