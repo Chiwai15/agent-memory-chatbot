@@ -75,10 +75,7 @@ def switch_to_next_api_key():
 
     current_api_key_index = next_index
     masked_key = API_KEYS[current_api_key_index][:20] + "..."
-    print(
-        f"🔄 Switching to API key #{
-            current_api_key_index + 1}/{
-            len(API_KEYS)} ({masked_key})")
+    print(f"Switching to API key #{current_api_key_index + 1}/{len(API_KEYS)} ({masked_key})")
 
     # Reinitialize LLM with new key
     llm = init_chat_model(
