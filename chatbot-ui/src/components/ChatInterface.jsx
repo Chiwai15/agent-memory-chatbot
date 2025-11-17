@@ -689,26 +689,26 @@ function ChatInterface() {
         </div>
 
         {/* Sessions Card */}
-        <div className="rounded-2xl sm:rounded-3xl p-4 sm:p-6 lg:p-8 flex-1 flex flex-col overflow-hidden" style={{ backgroundColor: colors.surface }}>
-          <div className="flex items-center justify-between mb-6">
+        <div className="rounded-2xl sm:rounded-3xl p-4 sm:p-5 lg:p-6 flex-1 flex flex-col overflow-hidden" style={{ backgroundColor: colors.surface }}>
+          <div className="flex items-center justify-between mb-4">
             <h2 className="text-sm font-semibold uppercase tracking-wider" style={{ color: colors.text }}>Sessions</h2>
             <button
               onClick={createNewSession}
-              className="w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center transition-all duration-300 hover:scale-105"
+              className="w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center transition-all duration-300 hover:scale-105"
               style={{ backgroundColor: colors.primary }}
             >
-              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
               </svg>
             </button>
           </div>
 
-          <div className="space-y-3 flex-1 overflow-y-auto pr-2 min-h-0" style={{ maxHeight: '420px' }}>
+          <div className="space-y-2 flex-1 overflow-y-auto pr-2 min-h-0" style={{ maxHeight: '420px' }}>
             {sessions.map((session) => (
               <div
                 key={session.id}
                 onClick={() => switchSession(session.id)}
-                className="group relative rounded-2xl p-5 cursor-pointer transition-all duration-300"
+                className="group relative rounded-xl p-3 cursor-pointer transition-all duration-300"
                 style={{
                   backgroundColor: colors.surface,
                   borderWidth: '1px',
@@ -716,9 +716,9 @@ function ChatInterface() {
                   borderColor: session.id === activeSessionId ? colors.primary : colors.border
                 }}
               >
-                <div className="flex items-center gap-2 sm:gap-3">
-                  <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-lg sm:rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: colors.primary }}>
-                    <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: colors.primary }}>
+                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                     </svg>
                   </div>
@@ -733,7 +733,7 @@ function ChatInterface() {
                       e.preventDefault();
                       deleteSession(session.id);
                     }}
-                    className="w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-200 hover:scale-110 hover:opacity-70 cursor-pointer"
+                    className="w-7 h-7 rounded-lg flex items-center justify-center transition-all duration-200 hover:scale-110 hover:opacity-70 cursor-pointer"
                     style={{
                       backgroundColor: colors.hover,
                       opacity: 0.6
@@ -751,7 +751,7 @@ function ChatInterface() {
 
           <button
             onClick={clearChat}
-            className="mt-6 w-full py-4 px-5 rounded-2xl text-sm font-medium transition-all duration-300 flex items-center justify-center gap-2 flex-shrink-0"
+            className="mt-4 w-full py-3 px-4 rounded-xl text-sm font-medium transition-all duration-300 flex items-center justify-center gap-2 flex-shrink-0"
             style={{ backgroundColor: colors.surface, borderWidth: '1px', borderStyle: 'solid', borderColor: colors.border, color: colors.text }}
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
