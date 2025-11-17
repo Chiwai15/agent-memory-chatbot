@@ -46,7 +46,6 @@ services:
       - chatbot-network
     volumes:
       - ./server.py:/app/server.py
-      - ./docs:/app/docs
 
   # Vite Frontend
   frontend:
