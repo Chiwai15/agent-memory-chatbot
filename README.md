@@ -229,6 +229,7 @@ agent-memory-chatbot/
 
 ### Core Documentation
 - **[Documentation Index](docs/core/README.md)** - Navigation hub for all technical docs
+- **[LangChain vs LangGraph](docs/langchain-vs-langgraph.md)** - Understanding the framework architecture and how they work together
 - **[Usage Guide](docs/core/usage-guide.md)** - 5 complete real-world use cases with code
 - **[Architecture](docs/core/architecture.md)** - System design and component architecture
 - **[Database Schema](docs/core/database-schema.md)** - Complete database design and ERD
