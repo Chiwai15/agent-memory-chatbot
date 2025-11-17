@@ -1007,7 +1007,7 @@ Generate the user's next message:`;
             <span className="flex-1">
               Demo Mode: Your messages may be modified or deleted by others.
               <br />
-              Running on Llama 3.3 70B free tier - please expect slower responses and limited tokens.
+              Running on Llama 3.1 8B free tier - please expect slower responses and limited tokens.
             </span>
           </div>
 
