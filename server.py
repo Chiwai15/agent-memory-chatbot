@@ -46,7 +46,19 @@ llm = init_chat_model(
 )
 
 # PostgreSQL connection string - use Railway's DATABASE_URL or fallback to localhost
-DB_URI = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/postgres?sslmode=disable")
+raw_database_url = os.getenv("DATABASE_URL")
+if raw_database_url:
+    print(f"Found DATABASE_URL environment variable: {raw_database_url[:30]}...")
+    # Railway DATABASE_URL might not have sslmode, add it if missing
+    if "sslmode=" not in raw_database_url:
+        DB_URI = raw_database_url + "?sslmode=disable"
+    else:
+        DB_URI = raw_database_url
+else:
+    print("WARNING: DATABASE_URL not found, using localhost fallback")
+    DB_URI = "postgresql://postgres:postgres@localhost:5432/postgres?sslmode=disable"
+
+print(f"Connecting to database: {DB_URI[:50]}...")
 
 # Memory configuration
 SHORT_TERM_MESSAGE_LIMIT = int(os.getenv("SHORT_TERM_MESSAGE_LIMIT", "30"))
