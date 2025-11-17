@@ -6,12 +6,7 @@
       "service": "ubereats",
       "mode": "agent",
       "messages": [
-        "Hi, I'm looking to order some food",
-        "What kind of restaurants are available?",
-        "I'd like pizza tonight. What do you recommend?",
-        "Sounds good! I prefer extra cheese",
-        "Let's order that. My address is 3001 Hilton Building, Burnaby",
-        "Please use my rewards points for payment"
+        "I want to order pizza for delivery"
       ]
     },
     {
@@ -20,12 +15,7 @@
       "service": "spotify",
       "mode": "agent",
       "messages": [
-        "Hey, I need help with music",
-        "Can you create a playlist for my workout?",
-        "I like upbeat electronic music and hip hop",
-        "Add some popular tracks from 2024",
-        "Perfect! Name it 'Morning Workout Mix'",
-        "Now start playing it"
+        "Create a workout playlist for me"
       ]
     },
     {
@@ -34,12 +24,7 @@
       "service": "lyft",
       "mode": "agent",
       "messages": [
-        "I need a ride to the airport",
-        "I'm at 123 Main Street, downtown",
-        "Going to Vancouver International Airport",
-        "What's the estimated arrival time?",
-        "Book the ride for me",
-        "Charge it to my saved payment method"
+        "I need a ride to Vancouver International Airport"
       ]
     },
     {
@@ -48,12 +33,7 @@
       "service": "netflix",
       "mode": "agent",
       "messages": [
-        "I want to watch something tonight",
-        "Recommend me a good action movie",
-        "What's trending right now?",
-        "Tell me more about the top recommendation",
-        "Alright, add it to my watchlist",
-        "Start playing it on my TV"
+        "I want to watch an action movie tonight"
       ]
     },
     {
@@ -62,12 +42,7 @@
       "service": "amazon",
       "mode": "agent",
       "messages": [
-        "I'm looking for wireless headphones",
-        "What are the best options under $200?",
-        "I prefer noise canceling with long battery life",
-        "Show me customer reviews for the top pick",
-        "Add it to my cart",
-        "Complete the order with express shipping to my default address"
+        "I need to buy wireless headphones"
       ]
     },
     {
@@ -76,12 +51,7 @@
       "service": "googlecalendar",
       "mode": "agent",
       "messages": [
-        "I need to schedule a team meeting",
-        "What's my availability tomorrow afternoon?",
-        "Book a 2-hour meeting at the earliest available slot",
-        "Title it 'Q1 Planning Review'",
-        "Send invites to john@company.com and sarah@company.com",
-        "Set a 15-minute reminder before the meeting"
+        "Schedule a 2-hour team meeting for tomorrow"
       ]
     }
   ]

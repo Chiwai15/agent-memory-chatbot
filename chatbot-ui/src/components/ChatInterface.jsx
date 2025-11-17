@@ -364,33 +364,10 @@ function ChatInterface() {
         try {
           errorData = await response.json();
         } catch (e) {
-          throw new Error('Failed to get response');
-        }
-
-        // Check for rate limit error
-        if (errorData?.detail?.includes('rate_limit_exceeded') ||
-            errorData?.detail?.includes('Rate limit reached') ||
-            errorData?.detail?.includes('All API keys have reached their rate limits')) {
-
-          // Check if all keys are exhausted
-          if (errorData?.detail?.includes('All API keys')) {
-            const errorMessage = {
-              role: 'assistant',
-              content: `⏱️ All API Keys Exhausted!\n\nAll available API keys have reached their daily token limits (100,000 tokens each).\n\nThe service will automatically resume when the limits reset (every 24 hours).\n\nTip: Try again later or contact the administrator to add more API keys.`,
-              timestamp: new Date().toISOString(),
-              isError: true,
-            };
-            setMessages((prev) => [...prev, errorMessage]);
-            return;
-          }
-
-          // Extract wait time if available
-          const waitTimeMatch = errorData.detail.match(/Please try again in ([^.]+)/);
-          const waitTime = waitTimeMatch ? waitTimeMatch[1] : 'a few minutes';
-
+          // If JSON parsing fails, show generic error
           const errorMessage = {
             role: 'assistant',
-            content: `⏱️ Daily token limit reached!\n\nThe AI service has used up its daily allocation of 100,000 tokens. Please try again in ${waitTime}.\n\nNote: Tokens are consumed by both your messages and my responses. Long conversations with memory retrieval use more tokens.`,
+            content: `❌ Server Error (${response.status})\n\nThe server returned an error. Please try again later.\n\nIf this persists, contact support.`,
             timestamp: new Date().toISOString(),
             isError: true,
           };
@@ -398,8 +375,41 @@ function ChatInterface() {
           return;
         }
 
-        // Other errors
-        throw new Error(errorData?.detail || 'Failed to get response');
+        const errorDetail = errorData?.detail || '';
+
+        // Check for rate limit error (429 status, "429" in text, or specific error messages)
+        if (response.status === 429 ||
+            errorDetail.includes('429') ||
+            errorDetail.includes('rate limit') ||
+            errorDetail.includes('Rate limit')) {
+
+          // Extract error code if present (format: [Code: abc123])
+          const codeMatch = errorDetail.match(/\[Code: ([^\]]+)\]/);
+          const errorCode = codeMatch ? codeMatch[1] : '';
+
+          // Extract the actual error message (remove "429: " prefix and code suffix)
+          let cleanError = errorDetail.replace(/^429:\s*/, '');
+          cleanError = cleanError.replace(/\s*\[Code: [^\]]+\]\s*$/, '').trim();
+
+          const errorMessage = {
+            role: 'assistant',
+            content: `⏱️ Rate Limit Error\n\n${cleanError}\n\n${errorCode ? `Error Code: ${errorCode}` : ''}`,
+            timestamp: new Date().toISOString(),
+            isError: true,
+          };
+          setMessages((prev) => [...prev, errorMessage]);
+          return;
+        }
+
+        // Other errors - show friendly message
+        const errorMessage = {
+          role: 'assistant',
+          content: `❌ Error: ${errorDetail || 'Something went wrong'}\n\nPlease try again or contact support if this continues.`,
+          timestamp: new Date().toISOString(),
+          isError: true,
+        };
+        setMessages((prev) => [...prev, errorMessage]);
+        return;
       }
 
       const data = await response.json();
@@ -564,7 +574,67 @@ function ChatInterface() {
     setMessages((prev) => prev.filter(msg => !msg.isTyping));
   };
 
-  // Auto-play persona messages
+  // Helper function to generate next user message using LLM
+  const generateNextUserMessage = async (conversationHistory, turnNumber, serviceName) => {
+    try {
+      const prompt = `You are simulating a user interacting with a ${serviceName} service agent.
+
+CONVERSATION SO FAR:
+${conversationHistory.map(msg => `${msg.role === 'user' ? 'User' : 'Agent'}: ${msg.content}`).join('\n')}
+
+TASK: Generate the user's NEXT message (turn ${turnNumber}/5) that would naturally follow this conversation.
+
+GUIDELINES:
+- Turn 2: Ask a relevant question about options, details, or clarification
+- Turn 3: Provide preferences, constraints, or additional information
+- Turn 4: Ask for verification of details (time, cost, confirmation)
+- Turn 5: Give final action command (book, order, confirm, execute)
+
+RULES:
+- Write ONLY the user's next message (1 sentence, natural tone)
+- NO explanations, NO quotes, NO labels like "User:"
+- Stay in character as a real service user
+- Be specific and relevant to the ${serviceName} service
+- Progress toward completing the task
+
+Generate the user's next message:`;
+
+      const response = await fetch(`${API_URL}/chat/v2`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message: prompt,
+          user_id: 'demo_message_generator',
+          memory_source: 'short',
+          mode_type: 'ask',
+          selected_service: null,
+          messages: []
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to generate message');
+      }
+
+      const data = await response.json();
+      return data.response.trim();
+
+    } catch (error) {
+      console.error('Error generating next message:', error);
+      // Fallback generic messages
+      const fallbacks = [
+        "What are my options?",
+        "That sounds good, what else do you need from me?",
+        "What are the details?",
+        "Please confirm and proceed"
+      ];
+      return fallbacks[Math.min(turnNumber - 2, fallbacks.length - 1)];
+    }
+  };
+
+  // Auto-play persona messages with LLM-generated follow-ups
   const playPersonaDemo = async () => {
     if (!selectedPersona || isPlaying) return;
 
@@ -581,17 +651,31 @@ function ChatInterface() {
 
     stopDemoRef.current = false;
     setIsPlaying(true);
-    setPlayProgress({ current: 0, total: persona.messages.length });
+    const totalTurns = 5;
+    setPlayProgress({ current: 0, total: totalTurns });
 
-    for (let i = 0; i < persona.messages.length; i++) {
+    // Track conversation for message generation
+    let conversationHistory = [];
+
+    for (let i = 0; i < totalTurns; i++) {
       // Check if stop was requested
       if (stopDemoRef.current) {
         break;
       }
-      const messageText = persona.messages[i];
+
+      // Determine message text
+      let messageText;
+      if (i === 0) {
+        // First message: use the persona's initial message
+        messageText = persona.messages[0];
+      } else {
+        // Generate follow-up messages using LLM
+        const serviceName = persona.service || 'general';
+        messageText = await generateNextUserMessage(conversationHistory, i + 1, serviceName);
+      }
 
       // Update progress
-      setPlayProgress({ current: i + 1, total: persona.messages.length });
+      setPlayProgress({ current: i + 1, total: totalTurns });
 
       // Add user message to UI
       const userMessage = {
@@ -600,6 +684,7 @@ function ChatInterface() {
         timestamp: new Date().toISOString(),
       };
       setMessages((prev) => [...prev, userMessage]);
+      conversationHistory.push({ role: 'user', content: messageText });
 
       // Wait a bit before sending to backend
       await new Promise(resolve => setTimeout(resolve, 500));
@@ -615,6 +700,8 @@ function ChatInterface() {
 
       try {
         // Send to backend
+        // For demo: send last 10 messages for context (enough for LLM to understand conversation)
+        // This is faster than sending all messages while maintaining conversation flow
         const response = await fetch(`${API_URL}/chat/v2`, {
           method: 'POST',
           headers: {
@@ -624,10 +711,11 @@ function ChatInterface() {
             message: messageText,
             user_id: userId,
             memory_source: memorySource,
-            mode_type: persona.mode || modeType, // Use persona's mode if specified
-            selected_service: persona.service || selectedService || null, // Use persona's service if specified
+            mode_type: persona.mode || modeType,
+            selected_service: persona.service || selectedService || null,
             messages: messages
-              .filter(msg => !msg.isTyping)
+              .filter(msg => !msg.isTyping && !msg.isError)
+              .slice(-10) // Last 10 messages for context
               .map(msg => ({
                 role: msg.role,
                 content: msg.content
@@ -636,7 +724,54 @@ function ChatInterface() {
         });
 
         if (!response.ok) {
-          throw new Error('Failed to get response');
+          // Try to parse error details
+          let errorData;
+          try {
+            errorData = await response.json();
+          } catch (e) {
+            errorData = { detail: 'Server error' };
+          }
+
+          const errorDetail = errorData?.detail || '';
+
+          // Remove typing indicator
+          setMessages((prev) => prev.filter(msg => !msg.isTyping));
+
+          // Check for rate limit error (429 status, "429" in text, or specific error messages)
+          if (response.status === 429 ||
+              errorDetail.includes('429') ||
+              errorDetail.includes('rate limit') ||
+              errorDetail.includes('Rate limit')) {
+
+            // Extract error code if present (format: [Code: abc123])
+            const codeMatch = errorDetail.match(/\[Code: ([^\]]+)\]/);
+            const errorCode = codeMatch ? codeMatch[1] : '';
+
+            // Extract the actual error message (remove "429: " prefix and code suffix)
+            let cleanError = errorDetail.replace(/^429:\s*/, '');
+            cleanError = cleanError.replace(/\s*\[Code: [^\]]+\]\s*$/, '').trim();
+
+            const errorMessage = {
+              role: 'assistant',
+              content: `⏱️ Rate Limit Error\n\n${cleanError}\n\nDemo has been paused.\n\n${errorCode ? `Error Code: ${errorCode}` : ''}`,
+              timestamp: new Date().toISOString(),
+              isError: true,
+            };
+            setMessages((prev) => [...prev, errorMessage]);
+            setIsPlaying(false);
+            return;
+          }
+
+          // Other errors
+          const errorMessage = {
+            role: 'assistant',
+            content: `❌ Demo Error\n\n${errorDetail}\n\nThe demo has been stopped.`,
+            timestamp: new Date().toISOString(),
+            isError: true,
+          };
+          setMessages((prev) => [...prev, errorMessage]);
+          setIsPlaying(false);
+          return;
         }
 
         const data = await response.json();
@@ -655,6 +790,7 @@ function ChatInterface() {
 
         // Remove typing indicator and add real response
         setMessages((prev) => prev.filter(msg => !msg.isTyping).concat(botMessage));
+        conversationHistory.push({ role: 'assistant', content: data.response });
 
         // Refresh debug panel
         await fetchDebugData();
@@ -664,8 +800,16 @@ function ChatInterface() {
 
       } catch (error) {
         console.error('Error in persona demo:', error);
-        // Remove typing indicator on error
+        // Remove typing indicator and show error
         setMessages((prev) => prev.filter(msg => !msg.isTyping));
+
+        const errorMessage = {
+          role: 'assistant',
+          content: `❌ Demo Error\n\nAn unexpected error occurred: ${error.message}\n\nThe demo has been stopped.`,
+          timestamp: new Date().toISOString(),
+          isError: true,
+        };
+        setMessages((prev) => [...prev, errorMessage]);
         setIsPlaying(false);
         return;
       }
@@ -860,7 +1004,11 @@ function ChatInterface() {
             <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
             </svg>
-            <span className="flex-1">Demo Mode: Your messages may be modified or deleted by others. (Shared Rate Limit: 60 req/min)</span>
+            <span className="flex-1">
+              Demo Mode: Your messages may be modified or deleted by others.
+              <br />
+              Running on Llama 3.3 70B free tier - please expect slower responses and limited tokens.
+            </span>
           </div>
 
           {/* Demo Controls */}
@@ -869,7 +1017,7 @@ function ChatInterface() {
               value={selectedPersona}
               onChange={(e) => {
                 if (isPlaying) {
-                  alert('Cannot change persona while demo is playing');
+                  alert('Cannot change demo while it is playing');
                   return;
                 }
                 setSelectedPersona(e.target.value);
@@ -883,7 +1031,7 @@ function ChatInterface() {
                 borderColor: colors.border
               }}
             >
-              <option value="">Select Demo Persona</option>
+              <option value="">Select Demo</option>
               {samplePersonasData.personas.map(persona => (
                 <option key={persona.id} value={persona.id}>{persona.name}</option>
               ))}
@@ -895,7 +1043,7 @@ function ChatInterface() {
                   stopDemo();
                 } else {
                   if (!selectedPersona) {
-                    alert('Please select a demo persona first');
+                    alert('Please select a demo first');
                     return;
                   }
                   playPersonaDemo();
@@ -1007,10 +1155,13 @@ function ChatInterface() {
               </div>
             ))}
           </div>
+        </div>
 
+        {/* Clear Chat Button - At bottom of sidebar */}
+        <div className="rounded-2xl sm:rounded-3xl p-3 sm:p-4 flex-shrink-0" style={{ backgroundColor: colors.surface }}>
           <button
             onClick={clearChat}
-            className="mt-4 w-full py-3 px-4 rounded-xl text-sm font-medium transition-all duration-200 flex items-center justify-center gap-2 flex-shrink-0 hover:scale-[1.02] active:scale-[0.98] hover:shadow-md"
+            className="w-full py-3 px-4 rounded-xl text-sm font-medium transition-all duration-200 flex items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98] hover:shadow-md"
             style={{ backgroundColor: colors.surface, borderWidth: '1px', borderStyle: 'solid', borderColor: colors.border, color: colors.text }}
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1367,7 +1518,7 @@ function ChatInterface() {
           <h2 className="text-base sm:text-lg font-bold" style={{ color: colors.text }}>Memory Pensieve</h2>
           <p className="text-xs mt-1" style={{ color: colors.textLight }}>Mode: {memorySource === 'short' ? 'Short-term only' : memorySource === 'long' ? 'Long-term only' : 'Both'}</p>
           <p className="text-xs mt-1" style={{ color: colors.textLight }}>User ID: {userId}</p>
-          <div className="mt-2 p-2 rounded-lg" style={{ backgroundColor: colors.hover }}>
+          <div className="mt-1 p-2 rounded-lg" style={{ backgroundColor: colors.hover }}>
             <p className="text-xs" style={{ color: colors.text }}>
               💡 Conversation compacting happens every 30 messages for long-term memory
             </p>
@@ -1384,7 +1535,7 @@ function ChatInterface() {
               </div>
             </div>
           ) : (
-            <div className="space-y-6">
+            <div className="space-y-2">
               {/* Tabs - only show when mode is "both" */}
               {memorySource === 'both' && (
                 <div className="flex gap-2 p-1 rounded-lg" style={{ backgroundColor: colors.hover }}>
@@ -1436,7 +1587,7 @@ function ChatInterface() {
                               <div key={idx} className="rounded-xl p-3" style={{ backgroundColor: colors.surface, borderWidth: '1px', borderStyle: 'solid', borderColor: colors.border }}>
                                 <div className="flex items-center gap-2 mb-2">
                                   <span className={`px-2 py-1 rounded text-xs font-medium ${msg.role === 'user' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}`}>
-                                    {msg.role === 'user' ? 'User' : 'Assistant'}
+                                    {msg.role === 'user' ? '👤 User' : '🤖 Assistant'}
                                   </span>
                                   <span className="text-xs" style={{ color: colors.textLight }}>
                                     #{messages.length - idx}

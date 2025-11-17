@@ -957,7 +957,12 @@ def create_system_prompt(mode_type: str = "ask",
         "- Short-term: Last 30 messages (session context)\n"
         "- Long-term: Persistent facts from [STORED MEMORIES] (always trust these over recent conversation)\n"
         "- When user asks 'what do you remember', list all [STORED MEMORIES]\n"
-        "- Be honest about what's stored when asked\n\n")
+        "- Be honest about what's stored when asked\n\n"
+        "CRITICAL - RESPONSE LENGTH:\n"
+        "- MAXIMUM 3 SHORT sentences per response\n"
+        "- NO bullet points, NO numbered lists, NO examples\n"
+        "- Get straight to the point\n"
+        "- If you write more than 50 words, you FAILED\n\n")
 
     # Mode-specific behavior
     if mode_type == "ask":
@@ -1060,6 +1065,8 @@ async def chat(request: ChatRequest):
     This endpoint uses both short-term (checkpointer) and long-term (store) memory
     to maintain context and remember user preferences across sessions.
     """
+    global current_api_key_index
+
     try:
         # Memory source mapping
         # Frontend sends: "short" (conversation history), "long" (persistent
@@ -1088,16 +1095,6 @@ async def chat(request: ChatRequest):
             mode_type=mode_type, selected_service=selected_service)
         print(f"Mode: {mode_type}, Service: {selected_service or 'None'}")
         print(f"System prompt preview: {dynamic_system_message.content[:200]}...")
-
-        # Create agent with dynamic system prompt for this request
-        request_agent = create_react_agent(
-            model=llm,
-            tools=[],
-            prompt=dynamic_system_message,
-            pre_model_hook=pre_model_hook,
-            checkpointer=global_checkpointer,
-            store=global_store
-        )
 
         # Retrieve long-term memories based on memory_source
         memories_context = ""
@@ -1168,6 +1165,25 @@ async def chat(request: ChatRequest):
 
         for attempt in range(max_retries):
             try:
+                # Create LLM with current API key (don't use global llm)
+                current_llm = init_chat_model(
+                    model=os.getenv("LLM_MODEL", "openai:gpt-4"),
+                    temperature=0.7,
+                    base_url=os.getenv("OPENAI_API_BASE", "https://api.openai.com/v1"),
+                    api_key=API_KEYS[current_api_key_index],
+                    model_kwargs={"max_tokens": 150}  # Strict limit: ~100-120 words max
+                )
+
+                # Create agent with current LLM
+                request_agent = create_react_agent(
+                    model=current_llm,
+                    tools=[],
+                    prompt=dynamic_system_message,
+                    pre_model_hook=pre_model_hook,
+                    checkpointer=global_checkpointer,
+                    store=global_store
+                )
+
                 agent_response = await request_agent.ainvoke(
                     {"messages": message_history},
                     config
@@ -1182,22 +1198,39 @@ async def chat(request: ChatRequest):
                 if "rate_limit_exceeded" in error_str.lower(
                 ) or "rate limit reached" in error_str.lower():
                     print(f"Rate limit hit on API key #{current_api_key_index + 1}")
+                    print(f"Raw error message: {error_str}")
+
+                    # Sanitize error message - extract wait time but remove sensitive data
+                    import re
+                    sanitized_message = "Rate limit reached. "
+
+                    # Extract wait time (e.g., "1m42.816s", "17m29.76s", "6s", "2h30m")
+                    # Match any combination of digits, dots, and time units (s/m/h)
+                    wait_time_match = re.search(r'try again in ([\d.smh]+)', error_str, re.IGNORECASE)
+                    if wait_time_match:
+                        wait_time = wait_time_match.group(1)
+                        sanitized_message += f"Please try again in {wait_time}."
+                    else:
+                        sanitized_message += "Please try again later."
 
                     # Try to switch to next key
                     if attempt < max_retries - 1:  # Not the last attempt
-                        if switch_to_next_api_key():
-                            print(f"Retrying with next API key (attempt {attempt + 2}/{max_retries})...")
-                            continue  # Retry with new key
-                        else:
-                            # No more keys available
-                            raise HTTPException(
-                                status_code=429,
-                                detail="All API keys have reached their rate limits. Please try again later.")
+                        current_api_key_index += 1
+                        masked_key = API_KEYS[current_api_key_index][:20] + "..." if len(API_KEYS[current_api_key_index]) > 20 else API_KEYS[current_api_key_index]
+                        print(f"Rate limit on key #{current_api_key_index}/{len(API_KEYS)}")
+                        print(f"Switching to key #{current_api_key_index + 1}/{len(API_KEYS)} ({masked_key})")
+                        print(f"Retrying (attempt {attempt + 2}/{max_retries})...")
+                        continue  # Retry with new key
                     else:
                         # Last attempt failed
+                        masked_key = API_KEYS[current_api_key_index][:20] + "..." if len(API_KEYS[current_api_key_index]) > 20 else API_KEYS[current_api_key_index]
+                        error_code = API_KEYS[current_api_key_index][-6:] if len(API_KEYS[current_api_key_index]) >= 6 else API_KEYS[current_api_key_index]
+                        debug_info = f"[DEBUG] Last key tried: #{current_api_key_index + 1}/{len(API_KEYS)} ({masked_key})"
+                        print(f"429 Error - {debug_info}")
+                        print(f"Full error details: {error_str}")
                         raise HTTPException(
                             status_code=429,
-                            detail="All API keys have reached their rate limits. Please try again later.")
+                            detail=f"429: {sanitized_message} [Code: {error_code}]")
                 else:
                     # Not a rate limit error, re-raise immediately
                     raise
@@ -1287,8 +1320,13 @@ async def chat(request: ChatRequest):
             thinking_process="Retrieved context and generated response",
             quality_score=0.9)
 
+    except HTTPException:
+        # Re-raise HTTPException as-is (preserves status code and sanitized message)
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        # Only catch non-HTTP exceptions - don't leak sensitive error details
+        print(f"Unexpected error in chat endpoint: {str(e)}")
+        raise HTTPException(status_code=500, detail="An unexpected error occurred")
 
 
 @app.get("/api/config")
