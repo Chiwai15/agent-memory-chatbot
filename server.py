@@ -1403,8 +1403,7 @@ async def clear_all_memories():
     except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to clear memories: {
-                str(e)}")
+            detail=f"Failed to clear memories: {str(e)}")
 
 
 @app.get("/users/list")
