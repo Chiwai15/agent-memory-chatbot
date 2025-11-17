@@ -1,25 +1,70 @@
 version: '3.8'
 
 services:
+  # PostgreSQL Database
   postgres:
-    image: postgres:15        # PostgreSQL version 15
-    container_name: postgres_db
+    image: postgres:15
+    container_name: memory_chatbot_db
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: postgres
-      TZ: UTC                 # Timezone setting
+      TZ: UTC
     ports:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     restart: unless-stopped
-    healthcheck:              # Health check configuration
+    healthcheck:
       test: ["CMD", "pg_isready", "-U", "postgres"]
       interval: 10s
       timeout: 5s
       retries: 5
-    command: ["postgres", "-c", "max_connections=200"]  # Custom configuration
+    command: ["postgres", "-c", "max_connections=200"]
+    networks:
+      - chatbot-network
+
+  # FastAPI Backend
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: memory_chatbot_backend
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/postgres
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_API_BASE=${OPENAI_API_BASE:-https://api.openai.com/v1}
+      - LLM_MODEL=${LLM_MODEL:-openai:gpt-4}
+      - SHORT_TERM_MESSAGE_LIMIT=${SHORT_TERM_MESSAGE_LIMIT:-30}
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - chatbot-network
+    volumes:
+      - ./server.py:/app/server.py
+      - ./docs:/app/docs
+
+  # Vite Frontend
+  frontend:
+    build:
+      context: ./chatbot-ui
+      dockerfile: Dockerfile
+    container_name: memory_chatbot_frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - chatbot-network
 
 volumes:
   pgdata:
+
+networks:
+  chatbot-network:
+    driver: bridge

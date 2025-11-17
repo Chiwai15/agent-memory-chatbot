@@ -36,6 +36,16 @@ function ChatInterface() {
   const [selectedPersona, setSelectedPersona] = useState('');
   const [isPlaying, setIsPlaying] = useState(false);
   const [playProgress, setPlayProgress] = useState({ current: 0, total: 0 });
+  const stopDemoRef = useRef(false);
+
+  // Agent mode states
+  const [modeType, setModeType] = useState('agent'); // Default to 'agent' mode - toggleable
+  const [showModeDropup, setShowModeDropup] = useState(false); // Mode type dropup visibility
+  const [hoveredModeType, setHoveredModeType] = useState(null); // Track hovered mode type
+  const [selectedService, setSelectedService] = useState(''); // Selected service ID
+  const [showServiceDropup, setShowServiceDropup] = useState(false); // Service dropup visibility
+  const [hoveredSubcategory, setHoveredSubcategory] = useState(null); // Track hovered subcategory for expansion
+  const [hoveredServiceItem, setHoveredServiceItem] = useState(null); // Track hovered service item
 
   // Session management - completely rebuilt for reliability
   // STEP 1: Initialize sessions first (single source of truth for session list)
@@ -100,6 +110,33 @@ function ChatInterface() {
   const userId = activeSessionId;
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
+  const modeDropupRef = useRef(null);
+  const serviceDropupRef = useRef(null);
+
+  // Click-outside detection for dropdowns
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      // Close mode dropdown if clicking outside
+      if (modeDropupRef.current && !modeDropupRef.current.contains(event.target)) {
+        setShowModeDropup(false);
+      }
+      // Close service dropdown if clicking outside
+      if (serviceDropupRef.current && !serviceDropupRef.current.contains(event.target)) {
+        setShowServiceDropup(false);
+        setHoveredSubcategory(null); // Also reset expanded subcategory
+      }
+    };
+
+    // Add event listener when dropdowns are open
+    if (showModeDropup || showServiceDropup) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    // Cleanup event listener
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showModeDropup, showServiceDropup]);
 
   // STEP 3: Persist sessions to localStorage whenever they change
   useEffect(() => {
@@ -310,6 +347,8 @@ function ChatInterface() {
           message: input,
           user_id: userId,
           memory_source: memorySource, // Send memory source preference
+          mode_type: modeType, // Send mode (ask/agent)
+          selected_service: selectedService || null, // Send selected service
           messages: messages
             .filter(msg => !msg.isError && !msg.isTyping) // Exclude error messages and typing indicators from memory
             .map(msg => ({
@@ -516,6 +555,15 @@ function ChatInterface() {
     setInput(promptText);
   };
 
+  // Stop demo
+  const stopDemo = () => {
+    stopDemoRef.current = true;
+    setIsPlaying(false);
+    setPlayProgress({ current: 0, total: 0 });
+    // Remove any typing indicators
+    setMessages((prev) => prev.filter(msg => !msg.isTyping));
+  };
+
   // Auto-play persona messages
   const playPersonaDemo = async () => {
     if (!selectedPersona || isPlaying) return;
@@ -523,10 +571,23 @@ function ChatInterface() {
     const persona = samplePersonasData.personas.find(p => p.id === selectedPersona);
     if (!persona) return;
 
+    // Set service and mode if specified in persona
+    if (persona.service) {
+      setSelectedService(persona.service);
+    }
+    if (persona.mode) {
+      setModeType(persona.mode);
+    }
+
+    stopDemoRef.current = false;
     setIsPlaying(true);
     setPlayProgress({ current: 0, total: persona.messages.length });
 
     for (let i = 0; i < persona.messages.length; i++) {
+      // Check if stop was requested
+      if (stopDemoRef.current) {
+        break;
+      }
       const messageText = persona.messages[i];
 
       // Update progress
@@ -563,6 +624,8 @@ function ChatInterface() {
             message: messageText,
             user_id: userId,
             memory_source: memorySource,
+            mode_type: persona.mode || modeType, // Use persona's mode if specified
+            selected_service: persona.service || selectedService || null, // Use persona's service if specified
             messages: messages
               .filter(msg => !msg.isTyping)
               .map(msg => ({
@@ -606,6 +669,11 @@ function ChatInterface() {
         setIsPlaying(false);
         return;
       }
+
+      // Check if stop was requested after API call
+      if (stopDemoRef.current) {
+        break;
+      }
     }
 
     setIsPlaying(false);
@@ -615,27 +683,170 @@ function ChatInterface() {
   const starterPrompts = [
     {
       icon: (
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
         </svg>
       ),
-      text: "Introduce yourself and share your interests"
+      text: "Select a service and ask me for information"
     },
     {
       icon: (
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      ),
+      text: "Switch to Agent mode and let me execute tasks for you"
+    },
+    {
+      icon: (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
         </svg>
       ),
-      text: "What do you remember about me?"
+      text: "Check what I remember about you from past conversations"
+    }
+  ];
+
+  // Mode types - Agent or Ask
+  const modeTypes = [
+    { id: 'agent', label: 'Agent Mode', description: 'AI executes tasks for you', icon: 'https://cdn.simpleicons.org/task' },
+    { id: 'ask', label: 'Ask Mode', description: 'AI provides information', icon: 'https://cdn.simpleicons.org/openai' }
+  ];
+
+  // Unified service categories - can be used with either Agent or Ask mode
+  // Using Simple Icons CDN for brand logos: https://simpleicons.org/
+  const serviceCategories = [
+        {
+          id: 'hotels',
+          name: 'Hotels & Stays',
+          icon: 'https://cdn.simpleicons.org/airbnb',
+          items: [
+            { id: 'airbnb', label: 'Airbnb', description: 'Homes & experiences', logo: 'https://cdn.simpleicons.org/airbnb' },
+            { id: 'booking', label: 'Booking.com', description: 'Hotels worldwide', logo: 'https://cdn.simpleicons.org/bookingdotcom' },
+            { id: 'expedia', label: 'Expedia', description: 'Travel booking platform', logo: 'https://cdn.simpleicons.org/expedia' },
+            { id: 'hotels', label: 'Hotels.com', description: 'Hotel bookings', logo: 'https://logo.clearbit.com/hotels.com' }
+          ]
+        },
+        {
+          id: 'food',
+          name: 'Food & Dining',
+          icon: 'https://cdn.simpleicons.org/ubereats',
+          items: [
+            { id: 'ubereats', label: 'Uber Eats', description: 'Food delivery', logo: 'https://cdn.simpleicons.org/ubereats' },
+            { id: 'doordash', label: 'DoorDash', description: 'Restaurant delivery', logo: 'https://cdn.simpleicons.org/doordash' },
+            { id: 'yelp', label: 'Yelp', description: 'Find & reserve restaurants', logo: 'https://cdn.simpleicons.org/yelp' },
+            { id: 'deliveroo', label: 'Deliveroo', description: 'Food delivery', logo: 'https://cdn.simpleicons.org/deliveroo' }
+          ]
+        },
+        {
+          id: 'transport',
+          name: 'Transportation',
+          icon: 'https://logo.clearbit.com/skyscanner.net',
+          items: [
+            { id: 'lyft', label: 'Lyft', description: 'Rideshare service', logo: 'https://cdn.simpleicons.org/lyft' },
+            { id: 'uber', label: 'Uber', description: 'Rideshare service', logo: 'https://cdn.simpleicons.org/uber' },
+            { id: 'skyscanner', label: 'Skyscanner', description: 'Flight search & booking', logo: 'https://logo.clearbit.com/skyscanner.net' },
+            { id: 'lime', label: 'Lime', description: 'E-scooter & bike sharing', logo: 'https://logo.clearbit.com/li.me' }
+          ]
+        },
+        {
+          id: 'shopping',
+          name: 'Shopping & Groceries',
+          icon: 'https://logo.clearbit.com/amazon.com',
+          items: [
+            { id: 'amazon', label: 'Amazon', description: 'E-commerce platform', logo: 'https://logo.clearbit.com/amazon.com' },
+            { id: 'instacart', label: 'Instacart', description: 'Grocery delivery', logo: 'https://cdn.simpleicons.org/instacart' },
+            { id: 'shopify', label: 'Shopify', description: 'E-commerce SaaS', logo: 'https://cdn.simpleicons.org/shopify' },
+            { id: 'etsy', label: 'Etsy', description: 'Marketplace platform', logo: 'https://cdn.simpleicons.org/etsy' }
+          ]
+        },
+        {
+          id: 'entertainment',
+          name: 'Entertainment',
+          icon: 'https://cdn.simpleicons.org/youtube',
+          items: [
+            { id: 'youtube', label: 'YouTube', description: 'Video platform', logo: 'https://cdn.simpleicons.org/youtube' },
+            { id: 'netflix', label: 'Netflix', description: 'Streaming service', logo: 'https://cdn.simpleicons.org/netflix' },
+            { id: 'primevideo', label: 'Prime Video', description: 'Amazon streaming', logo: 'https://logo.clearbit.com/primevideo.com' },
+            { id: 'spotify', label: 'Spotify', description: 'Music streaming', logo: 'https://cdn.simpleicons.org/spotify' }
+          ]
+        },
+        {
+          id: 'schedule',
+          name: 'Calendar & Scheduling',
+          icon: 'https://cdn.simpleicons.org/googlecalendar',
+          items: [
+            { id: 'googlecalendar', label: 'Google Calendar', description: 'Schedule management', logo: 'https://cdn.simpleicons.org/googlecalendar' },
+            { id: 'calendly', label: 'Calendly', description: 'Meeting scheduler', logo: 'https://cdn.simpleicons.org/calendly' },
+            { id: 'outlook', label: 'Outlook', description: 'Email & calendar', logo: 'https://logo.clearbit.com/outlook.com' },
+            { id: 'zoom', label: 'Zoom', description: 'Video meetings', logo: 'https://cdn.simpleicons.org/zoom' }
+          ]
+        },
+    {
+      id: 'productivity',
+      name: 'Docs & Productivity',
+      icon: 'https://cdn.simpleicons.org/notion',
+      items: [
+        { id: 'notion', label: 'Notion', description: 'Workspace & docs', logo: 'https://cdn.simpleicons.org/notion' },
+        { id: 'googledrive', label: 'Google Drive', description: 'Cloud storage & docs', logo: 'https://cdn.simpleicons.org/googledrive' },
+        { id: 'slack', label: 'Slack', description: 'Team communication', logo: 'https://cdn.simpleicons.org/slack' },
+        { id: 'microsoft', label: 'Microsoft 365', description: 'Office suite', logo: 'https://cdn.simpleicons.org/microsoft' }
+      ]
     },
     {
-      icon: (
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-        </svg>
-      ),
-      text: "Update or modify existing information"
+      id: 'health',
+      name: 'Health & Medical',
+      icon: 'https://cdn.simpleicons.org/strava',
+      items: [
+        { id: 'strava', label: 'Strava', description: 'Fitness tracking', logo: 'https://cdn.simpleicons.org/strava' },
+        { id: 'headspace', label: 'Headspace', description: 'Meditation & wellness', logo: 'https://cdn.simpleicons.org/headspace' },
+        { id: 'peloton', label: 'Peloton', description: 'Connected fitness', logo: 'https://cdn.simpleicons.org/peloton' },
+        { id: 'tempus', label: 'Tempus AI', description: 'AI-powered healthcare', logo: 'https://logo.clearbit.com/tempus.com' }
+      ]
+    },
+    {
+      id: 'finance',
+      name: 'Finance & Money',
+      icon: 'https://cdn.simpleicons.org/paypal',
+      items: [
+        { id: 'paypal', label: 'PayPal', description: 'Digital payments', logo: 'https://cdn.simpleicons.org/paypal' },
+        { id: 'venmo', label: 'Venmo', description: 'Send & receive money', logo: 'https://cdn.simpleicons.org/venmo' },
+        { id: 'chase', label: 'Chase', description: 'Banking services', logo: 'https://cdn.simpleicons.org/chase' },
+        { id: 'cashapp', label: 'Cash App', description: 'Mobile payments', logo: 'https://cdn.simpleicons.org/cashapp' }
+      ]
+    },
+    {
+      id: 'learning',
+      name: 'Learning & Education',
+      icon: 'https://cdn.simpleicons.org/coursera',
+      items: [
+        { id: 'coursera', label: 'Coursera', description: 'Online courses', logo: 'https://cdn.simpleicons.org/coursera' },
+        { id: 'udemy', label: 'Udemy', description: 'Skill development', logo: 'https://cdn.simpleicons.org/udemy' },
+        { id: 'khanacademy', label: 'Khan Academy', description: 'Free education', logo: 'https://cdn.simpleicons.org/khanacademy' },
+        { id: 'duolingo', label: 'Duolingo', description: 'Language learning', logo: 'https://cdn.simpleicons.org/duolingo' }
+      ]
+    },
+    {
+      id: 'career',
+      name: 'Career & Jobs',
+      icon: 'https://cdn.simpleicons.org/indeed',
+      items: [
+        { id: 'indeed', label: 'Indeed', description: 'Job search', logo: 'https://cdn.simpleicons.org/indeed' },
+        { id: 'glassdoor', label: 'Glassdoor', description: 'Company reviews', logo: 'https://cdn.simpleicons.org/glassdoor' },
+        { id: 'github', label: 'GitHub', description: 'Code portfolio', logo: 'https://cdn.simpleicons.org/github' },
+        { id: 'upwork', label: 'Upwork', description: 'Freelance work', logo: 'https://cdn.simpleicons.org/upwork' }
+      ]
+    },
+    {
+      id: 'knowledge',
+      name: 'Knowledge & Research',
+      icon: 'https://cdn.simpleicons.org/googlescholar',
+      items: [
+        { id: 'googlescholar', label: 'Google Scholar', description: 'Academic research', logo: 'https://cdn.simpleicons.org/googlescholar' },
+        { id: 'wikipedia', label: 'Wikipedia', description: 'Encyclopedia', logo: 'https://cdn.simpleicons.org/wikipedia' },
+        { id: 'reddit', label: 'Reddit', description: 'Community discussions', logo: 'https://cdn.simpleicons.org/reddit' },
+        { id: 'stackoverflow', label: 'Stack Overflow', description: 'Programming Q&A', logo: 'https://cdn.simpleicons.org/stackoverflow' }
+      ]
     }
   ];
 
@@ -680,28 +891,29 @@ function ChatInterface() {
 
             <button
               onClick={() => {
-                if (!selectedPersona) {
-                  alert('Please select a demo persona first');
-                  return;
-                }
                 if (isPlaying) {
-                  alert('Demo is already playing. Please wait for it to finish.');
-                  return;
+                  stopDemo();
+                } else {
+                  if (!selectedPersona) {
+                    alert('Please select a demo persona first');
+                    return;
+                  }
+                  playPersonaDemo();
                 }
-                playPersonaDemo();
               }}
               className="px-4 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 hover:scale-105 active:scale-95 hover:opacity-80 flex items-center gap-2"
               style={{
-                backgroundColor: colors.accent,
+                backgroundColor: isPlaying ? '#ef4444' : colors.accent,
                 color: colors.textOnDark
               }}
             >
               {isPlaying ? (
                 <>
-                  <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 9v6m4-6v6" />
                   </svg>
-                  <span>{playProgress.current}/{playProgress.total}</span>
+                  <span>Stop ({playProgress.current}/{playProgress.total})</span>
                 </>
               ) : (
                 <>
@@ -719,25 +931,25 @@ function ChatInterface() {
 
       <div className="flex-1 flex flex-col lg:flex-row p-3 sm:p-4 lg:p-6 gap-3 sm:gap-4 lg:gap-6 overflow-hidden">
       {/* Sidebar */}
-      <div className="w-full lg:w-80 flex flex-col gap-3 sm:gap-4 lg:gap-6 h-auto lg:h-full">
+      <div className="w-full lg:w-80 flex flex-col gap-2 sm:gap-3 lg:gap-4 h-auto lg:h-full">
         {/* Logo Card */}
-        <div className="rounded-2xl sm:rounded-3xl p-4 sm:p-6 lg:p-8 flex-shrink-0" style={{ backgroundColor: colors.surface }}>
-          <div className="flex items-center gap-3 sm:gap-4">
-            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl flex items-center justify-center" style={{ backgroundColor: colors.primary }}>
-              <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="rounded-2xl sm:rounded-3xl p-3 sm:p-3 lg:p-4 flex-shrink-0" style={{ backgroundColor: colors.surface }}>
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: colors.primary }}>
+              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
               </svg>
             </div>
             <div>
-              <h1 className="text-xl font-bold" style={{ color: colors.text }}>MemoryBank</h1>
-              <p className="text-xs" style={{ color: colors.textLight }}>AI with Memory</p>
+              <h1 className="text-lg font-bold" style={{ color: colors.text }}>ServiceAgent</h1>
+              <p className="text-xs" style={{ color: colors.textLight }}>AI Agent with Memory</p>
             </div>
           </div>
         </div>
 
         {/* Sessions Card */}
-        <div className="rounded-2xl sm:rounded-3xl p-4 sm:p-5 lg:p-6 flex-1 flex flex-col overflow-hidden" style={{ backgroundColor: colors.surface }}>
-          <div className="flex items-center justify-between mb-4">
+        <div className="rounded-2xl sm:rounded-3xl p-3 sm:p-4 lg:p-5 flex-1 flex flex-col overflow-hidden" style={{ backgroundColor: colors.surface }}>
+          <div className="flex items-center justify-between mb-3">
             <h2 className="text-sm font-semibold uppercase tracking-wider" style={{ color: colors.text }}>Sessions</h2>
             <button
               onClick={createNewSession}
@@ -765,7 +977,7 @@ function ChatInterface() {
               >
                 <div className="flex items-center gap-2">
                   <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: colors.primary }}>
-                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                     </svg>
                   </div>
@@ -820,9 +1032,9 @@ function ChatInterface() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
                 </svg>
               </div>
-              <h2 className="text-2xl font-bold mb-2" style={{ color: colors.text }}>Welcome to MemoryBank</h2>
+              <h2 className="text-2xl font-bold mb-2" style={{ color: colors.text }}>Welcome to ServiceAgent</h2>
               <p className="mb-6 text-center max-w-md text-sm" style={{ color: colors.textLight }}>
-                AI assistant with persistent memory powered by vector embeddings
+                AI service agent with Ask and Agent modes for information and automated workflows
               </p>
 
               <div className="space-y-2 w-full max-w-md">
@@ -942,52 +1154,175 @@ function ChatInterface() {
           )}
         </div>
 
-        {/* Input Container with Memory Source Selection */}
-        <div className="p-3 sm:p-4 lg:p-5 flex-shrink-0" style={{ borderTopWidth: '1px', borderTopStyle: 'solid', borderTopColor: colors.border }}>
-          {/* Memory Source Buttons */}
-          <div className="max-w-4xl mx-auto mb-3">
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold" style={{ color: colors.textLight }}>Memory Mode:</span>
-              <div className="flex gap-3">
+        {/* Input Container with Mode Selectors */}
+        <div className="p-2 sm:p-3 flex-shrink-0" style={{ borderTopWidth: '1px', borderTopStyle: 'solid', borderTopColor: colors.border }}>
+          {/* Compact Mode Selectors - Single Row */}
+          <div className="max-w-4xl mx-auto mb-2">
+            <div className="flex items-center gap-3 flex-wrap">
+              {/* Mode Type Selector (Ask/Agent) */}
+              <div className="relative" ref={modeDropupRef}>
                 <button
-                  onClick={() => setMemorySource('short')}
-                  className="px-3 py-1.5 rounded-xl text-xs font-medium transition-all duration-200 hover:scale-105 active:scale-95"
-                  style={{
-                    backgroundColor: memorySource === 'short' ? colors.primary : colors.surface,
-                    color: memorySource === 'short' ? 'white' : colors.text,
-                    borderWidth: '1px',
-                    borderStyle: 'solid',
-                    borderColor: memorySource === 'short' ? colors.primary : colors.border
-                  }}
+                  onClick={() => setShowModeDropup(!showModeDropup)}
+                  className="pl-3 pr-1.5 py-0.5 rounded-full text-[10px] font-medium transition-all duration-200 hover:opacity-90 flex items-center gap-1.5"
+                  style={{ backgroundColor: '#e8f5e9', color: '#165c33' }}
                 >
-                  Short-term
+                  <span className="capitalize">{modeType}</span>
+                  <svg className={`w-2.5 h-2.5 transition-transform duration-200 ${showModeDropup ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
                 </button>
+                {showModeDropup && (
+                  <div className="absolute bottom-full left-0 mb-1 w-40 rounded-lg shadow-xl overflow-hidden z-50" style={{ backgroundColor: colors.surface, borderWidth: '1px', borderStyle: 'solid', borderColor: colors.border }}>
+                    <div className="p-1">
+                      <button
+                        onClick={() => { setModeType('ask'); setShowModeDropup(false); }}
+                        onMouseEnter={() => setHoveredModeType('ask')}
+                        onMouseLeave={() => setHoveredModeType(null)}
+                        className="w-full text-left px-2 py-1.5 rounded text-[10px] font-medium transition-all duration-200"
+                        style={{
+                          backgroundColor: (modeType === 'ask' || hoveredModeType === 'ask') ? '#e8f5e9' : 'transparent',
+                          color: (modeType === 'ask' || hoveredModeType === 'ask') ? '#165c33' : colors.text
+                        }}
+                      >
+                        Ask
+                      </button>
+                      <button
+                        onClick={() => { setModeType('agent'); setShowModeDropup(false); }}
+                        onMouseEnter={() => setHoveredModeType('agent')}
+                        onMouseLeave={() => setHoveredModeType(null)}
+                        className="w-full text-left px-2 py-1.5 rounded text-[10px] font-medium transition-all duration-200"
+                        style={{
+                          backgroundColor: (modeType === 'agent' || hoveredModeType === 'agent') ? '#e8f5e9' : 'transparent',
+                          color: (modeType === 'agent' || hoveredModeType === 'agent') ? '#165c33' : colors.text
+                        }}
+                      >
+                        Agent
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Service Selector */}
+              <div className="relative" ref={serviceDropupRef}>
                 <button
-                  onClick={() => setMemorySource('long')}
-                  className="px-3 py-1.5 rounded-xl text-xs font-medium transition-all duration-200 hover:scale-105 active:scale-95"
-                  style={{
-                    backgroundColor: memorySource === 'long' ? colors.secondary : colors.surface,
-                    color: memorySource === 'long' ? 'white' : colors.text,
-                    borderWidth: '1px',
-                    borderStyle: 'solid',
-                    borderColor: memorySource === 'long' ? colors.secondary : colors.border
-                  }}
+                  onClick={() => setShowServiceDropup(!showServiceDropup)}
+                  className="px-2 py-0.5 rounded-full text-[10px] font-medium transition-all duration-200 hover:opacity-90 flex items-center gap-1.5 min-w-[120px]"
+                  style={{ backgroundColor: '#e8f5e9', color: '#165c33' }}
                 >
-                  Long-term
+                  {selectedService ? (
+                    (() => {
+                      const allItems = serviceCategories.flatMap(cat => cat.items);
+                      const selected = allItems.find(item => item.id === selectedService);
+                      return selected ? (
+                        <><img src={selected.logo} alt="" className="w-3 h-3 flex-shrink-0" />
+                        <span className="flex-1 text-left truncate">{selected.label}</span></>
+                      ) : 'Select service';
+                    })()
+                  ) : 'Select service'}
+                  <svg className={`w-2.5 h-2.5 transition-transform duration-200 flex-shrink-0 ${showServiceDropup ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
                 </button>
-                <button
-                  onClick={() => setMemorySource('both')}
-                  className="px-3 py-1.5 rounded-xl text-xs font-medium transition-all duration-200 hover:scale-105 active:scale-95"
-                  style={{
-                    backgroundColor: memorySource === 'both' ? colors.primary : colors.surface,
-                    color: memorySource === 'both' ? 'white' : colors.text,
-                    borderWidth: '1px',
-                    borderStyle: 'solid',
-                    borderColor: memorySource === 'both' ? colors.primary : colors.border
-                  }}
-                >
-                  Both
-                </button>
+                {showServiceDropup && (
+                  <div className="absolute bottom-full left-0 mb-1 w-80 rounded-lg shadow-2xl overflow-hidden z-50" style={{ backgroundColor: colors.surface, borderWidth: '1px', borderStyle: 'solid', borderColor: colors.border, maxHeight: '400px' }}>
+                    <div className="overflow-y-auto max-h-96 p-2 space-y-0.5">
+                      {serviceCategories.map(category => (
+                        <div key={category.id}>
+                          <button
+                            onMouseEnter={() => setHoveredSubcategory(category.id)}
+                            onMouseLeave={() => setHoveredSubcategory(null)}
+                            className="w-full text-left px-2 py-1 rounded text-[10px] transition-all duration-200 flex items-center gap-1.5"
+                            style={{ backgroundColor: hoveredSubcategory === category.id ? colors.hover : 'transparent', color: colors.text }}
+                          >
+                            <img src={category.icon} alt="" className="w-3 h-3 flex-shrink-0" />
+                            <span className="flex-1 font-medium">{category.name}</span>
+                            <svg className="w-2.5 h-2.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                            </svg>
+                          </button>
+                          <div
+                            className="overflow-hidden transition-all duration-300 ease-in-out ml-4"
+                            style={{ maxHeight: hoveredSubcategory === category.id ? `${category.items.length * 50}px` : '0px', opacity: hoveredSubcategory === category.id ? 1 : 0 }}
+                            onMouseEnter={() => setHoveredSubcategory(category.id)}
+                            onMouseLeave={() => setHoveredSubcategory(null)}
+                          >
+                            <div className="mt-0.5 space-y-0.5 pl-2" style={{ borderLeftWidth: '2px', borderLeftStyle: 'solid', borderLeftColor: colors.primary }}>
+                              {category.items.map(item => (
+                                <button
+                                  key={item.id}
+                                  onClick={() => { setSelectedService(item.id); setShowServiceDropup(false); setHoveredSubcategory(null); }}
+                                  onMouseEnter={() => setHoveredServiceItem(item.id)}
+                                  onMouseLeave={() => setHoveredServiceItem(null)}
+                                  className="w-full text-left px-2 py-1 rounded text-[10px] transition-all duration-200 flex items-start gap-1.5"
+                                  style={{
+                                    backgroundColor: selectedService === item.id ? colors.primary : (hoveredServiceItem === item.id ? '#e8f5e9' : 'transparent'),
+                                    color: selectedService === item.id ? 'white' : (hoveredServiceItem === item.id ? '#165c33' : colors.text)
+                                  }}
+                                >
+                                  <img src={item.logo} alt={item.label} className="w-3 h-3 mt-0.5 flex-shrink-0" />
+                                  <div className="flex-1 min-w-0">
+                                    <div className="font-medium truncate">{item.label}</div>
+                                    <div className="opacity-60 text-[9px] truncate">{item.description}</div>
+                                  </div>
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Divider */}
+              <div className="h-4 w-px" style={{ backgroundColor: colors.border }}></div>
+
+              {/* Memory Mode Selector */}
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] font-medium uppercase tracking-wide" style={{ color: colors.textLight }}>Memory:</span>
+                <div className="flex gap-1.5">
+                  <button
+                    onClick={() => setMemorySource('short')}
+                    className="px-2 py-1 rounded-lg text-[10px] font-medium transition-all duration-200 hover:opacity-80"
+                    style={{
+                      backgroundColor: memorySource === 'short' ? colors.primary : colors.surface,
+                      color: memorySource === 'short' ? 'white' : colors.text,
+                      borderWidth: '1px',
+                      borderStyle: 'solid',
+                      borderColor: memorySource === 'short' ? colors.primary : colors.border
+                    }}
+                  >
+                    Short
+                  </button>
+                  <button
+                    onClick={() => setMemorySource('long')}
+                    className="px-2 py-1 rounded-lg text-[10px] font-medium transition-all duration-200 hover:opacity-80"
+                    style={{
+                      backgroundColor: memorySource === 'long' ? colors.secondary : colors.surface,
+                      color: memorySource === 'long' ? 'white' : colors.text,
+                      borderWidth: '1px',
+                      borderStyle: 'solid',
+                      borderColor: memorySource === 'long' ? colors.secondary : colors.border
+                    }}
+                  >
+                    Long
+                  </button>
+                  <button
+                    onClick={() => setMemorySource('both')}
+                    className="px-2 py-1 rounded-lg text-[10px] font-medium transition-all duration-200 hover:opacity-80"
+                    style={{
+                      backgroundColor: memorySource === 'both' ? colors.primary : colors.surface,
+                      color: memorySource === 'both' ? 'white' : colors.text,
+                      borderWidth: '1px',
+                      borderStyle: 'solid',
+                      borderColor: memorySource === 'both' ? colors.primary : colors.border
+                    }}
+                  >
+                    Both
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -1016,7 +1351,7 @@ function ChatInterface() {
                 className="px-4 sm:px-5 py-2 sm:py-3 rounded-xl sm:rounded-2xl font-medium transition-all duration-200 hover:scale-105 active:scale-95 hover:shadow-lg flex items-center gap-2"
                 style={{ backgroundColor: colors.primary, color: 'white' }}
               >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
                 </svg>
                 Send
@@ -1029,10 +1364,10 @@ function ChatInterface() {
       {/* Debug Panel - ALWAYS VISIBLE */}
       <div className="w-full lg:w-96 rounded-2xl sm:rounded-3xl overflow-hidden h-auto lg:h-full flex flex-col" style={{ backgroundColor: colors.surface }}>
         <div className="p-4 sm:p-6 lg:p-8 flex-shrink-0" style={{ borderBottomWidth: '1px', borderBottomStyle: 'solid', borderBottomColor: colors.border }}>
-          <h2 className="text-base sm:text-lg font-bold" style={{ color: colors.text }}>Memory Pensieve ⛲️</h2>
+          <h2 className="text-base sm:text-lg font-bold" style={{ color: colors.text }}>Memory Pensieve</h2>
           <p className="text-xs mt-1" style={{ color: colors.textLight }}>Mode: {memorySource === 'short' ? 'Short-term only' : memorySource === 'long' ? 'Long-term only' : 'Both'}</p>
           <p className="text-xs mt-1" style={{ color: colors.textLight }}>User ID: {userId}</p>
-          <div className="mt-3 p-2 rounded-lg" style={{ backgroundColor: colors.hover }}>
+          <div className="mt-2 p-2 rounded-lg" style={{ backgroundColor: colors.hover }}>
             <p className="text-xs" style={{ color: colors.text }}>
               💡 Conversation compacting happens every 30 messages for long-term memory
             </p>
@@ -1061,7 +1396,7 @@ function ChatInterface() {
                       color: penseiveView === 'short' ? 'white' : colors.text
                     }}
                   >
-                    💬 Short-term
+                    Short-term
                   </button>
                   <button
                     onClick={() => setPenseiveView('long')}
@@ -1071,7 +1406,7 @@ function ChatInterface() {
                       color: penseiveView === 'long' ? 'white' : colors.text
                     }}
                   >
-                    💾 Long-term
+                    Long-term
                   </button>
                 </div>
               )}
@@ -1101,7 +1436,7 @@ function ChatInterface() {
                               <div key={idx} className="rounded-xl p-3" style={{ backgroundColor: colors.surface, borderWidth: '1px', borderStyle: 'solid', borderColor: colors.border }}>
                                 <div className="flex items-center gap-2 mb-2">
                                   <span className={`px-2 py-1 rounded text-xs font-medium ${msg.role === 'user' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}`}>
-                                    {msg.role === 'user' ? '👤 User' : '🤖 Assistant'}
+                                    {msg.role === 'user' ? 'User' : 'Assistant'}
                                   </span>
                                   <span className="text-xs" style={{ color: colors.textLight }}>
                                     #{messages.length - idx}

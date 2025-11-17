@@ -29,7 +29,10 @@ app.add_middleware(
 
 # API Key Rotation Setup
 # Support multiple comma-separated API keys for automatic rotation
-API_KEYS = [key.strip() for key in os.getenv("OPENAI_API_KEY", "your-api-key-here").split(",")]
+API_KEYS = [
+    key.strip() for key in os.getenv(
+        "OPENAI_API_KEY",
+        "your-api-key-here").split(",")]
 current_api_key_index = 0
 
 print(f"🔑 Loaded {len(API_KEYS)} API key(s) for rotation")
@@ -72,7 +75,10 @@ def switch_to_next_api_key():
 
     current_api_key_index = next_index
     masked_key = API_KEYS[current_api_key_index][:20] + "..."
-    print(f"🔄 Switching to API key #{current_api_key_index + 1}/{len(API_KEYS)} ({masked_key})")
+    print(
+        f"🔄 Switching to API key #{
+            current_api_key_index + 1}/{
+            len(API_KEYS)} ({masked_key})")
 
     # Reinitialize LLM with new key
     llm = init_chat_model(
@@ -105,6 +111,9 @@ class ChatRequest(BaseModel):
     user_id: str
     memory_source: Optional[str] = "both"  # "short", "long", "both"
     messages: Optional[List[Message]] = []
+    mode_type: Optional[str] = "ask"  # "ask" or "agent"
+    # Service ID like "youtube", "airbnb", etc.
+    selected_service: Optional[str] = None
 
 
 class ChatResponse(BaseModel):
@@ -124,8 +133,10 @@ class ExtractedEntity(BaseModel):
     value: str  # The actual value
     confidence: float  # Confidence score 0.0-1.0
     context: Optional[str] = None  # Surrounding context
-    temporal_status: Optional[str] = "current"  # Temporal context: "past", "current", "future", or None
-    reference_sentence: Optional[str] = None  # Original sentence for context preservation
+    # Temporal context: "past", "current", "future", or None
+    temporal_status: Optional[str] = "current"
+    # Original sentence for context preservation
+    reference_sentence: Optional[str] = None
 
 
 class MemoryExtraction(BaseModel):
@@ -143,7 +154,8 @@ def pre_model_hook(state):
     """
     trimmed_messages = trim_messages(
         messages=state["messages"],
-        max_tokens=SHORT_TERM_MESSAGE_LIMIT,  # Keep last N messages (configured in .env)
+        max_tokens=SHORT_TERM_MESSAGE_LIMIT,
+        # Keep last N messages (configured in .env)
         strategy="last",
         token_counter=len,
         start_on="human",
@@ -241,10 +253,9 @@ SCORING GUIDELINES:
   * <0.5: Casual mentions
 
 RESPONSE FORMAT (JSON):
-{{
-  "entities": [
-    {{"type": "location", "value": "Hong Kong", "confidence": 1.0, "context": "User's past residence", "temporal_status": "past", "reference_sentence": "I lived in Hong Kong"}},
-    {{"type": "location", "value": "Canada", "confidence": 1.0, "context": "User's current residence", "temporal_status": "current", "reference_sentence": "I moved to Canada now"}},
+{{"entities": [
+    {{"type": "location", "value": "Hong Kong", "confidence": 1.0, "context": "User's past residence", "temporal_status": "past", "reference_sentence": "I lived in Hong Kong"}} ,
+    {{"type": "location", "value": "Canada", "confidence": 1.0, "context": "User's current residence", "temporal_status": "current", "reference_sentence": "I moved to Canada now"}} ,
     {{"type": "person_name", "value": "John", "confidence": 1.0, "context": "User's name", "temporal_status": null, "reference_sentence": "My name is John"}}
   ],
   "summary": "User lived in Hong Kong (past) and now lives in Canada (current). User's name is John.",
@@ -259,8 +270,7 @@ Extract:
 - location: "Canada" (temporal_status: "current", reference_sentence: "moved to Canada now")
 
 If there's NOTHING worth remembering (casual chat, questions, etc.), return:
-{{
-  "entities": [],
+{{"entities": [],
   "summary": "No memorable information",
   "importance": 0.0,
   "should_store": false
@@ -311,48 +321,690 @@ Analyze the conversation and respond with ONLY valid JSON:"""
         return None
 
 
+# Define a function to create dynamic system prompts based on mode and service
+def create_system_prompt(mode_type: str = "ask",
+                         selected_service: str = None) -> SystemMessage:
+    """
+    Create a dynamic system prompt based on mode type and selected service.
+
+    Args:
+        mode_type: "ask" (information) or "agent" (execution/planning)
+        selected_service: Service ID like "youtube", "netflix", "airbnb", etc.
+    """
+
+    # Service capabilities catalog
+    service_capabilities = {
+        "youtube": {
+            "name": "YouTube",
+            "ask_capabilities": [
+                "Search for videos on any topic",
+                "Get trending videos and popular content",
+                "Find channels and creators",
+                "Check video statistics and information"
+            ],
+            "agent_capabilities": [
+                "Play specific videos or music",
+                "Create and manage playlists",
+                "Subscribe to channels",
+                "Like and save videos"
+            ]
+        },
+        "netflix": {
+            "name": "Netflix",
+            "ask_capabilities": [
+                "Search for movies and TV shows",
+                "Get recommendations based on preferences",
+                "Check what's new and trending",
+                "Find content by genre or actor"
+            ],
+            "agent_capabilities": [
+                "Start playing movies or shows",
+                "Add to watchlist",
+                "Continue watching from last position",
+                "Download content for offline viewing"
+            ]
+        },
+        "primevideo": {
+            "name": "Prime Video",
+            "ask_capabilities": [
+                "Browse Prime Video catalog",
+                "Find included vs rental content",
+                "Get personalized recommendations",
+                "Check new releases and deals"
+            ],
+            "agent_capabilities": [
+                "Stream movies and shows",
+                "Rent or purchase content",
+                "Add to watchlist",
+                "Manage Prime Video channels"
+            ]
+        },
+        "spotify": {
+            "name": "Spotify",
+            "ask_capabilities": [
+                "Search for songs, artists, and albums",
+                "Discover new music and podcasts",
+                "Find playlists by mood or genre",
+                "Check what's trending"
+            ],
+            "agent_capabilities": [
+                "Play songs, albums, or playlists",
+                "Create and manage playlists",
+                "Like and save songs",
+                "Follow artists and podcasts"
+            ]
+        },
+        "airbnb": {
+            "name": "Airbnb",
+            "ask_capabilities": [
+                "Search for accommodations by location",
+                "Check prices and availability",
+                "View property details and reviews",
+                "Compare different listings"
+            ],
+            "agent_capabilities": [
+                "Book accommodations",
+                "Send booking requests to hosts",
+                "Manage reservations",
+                "Process payments and confirmations"
+            ]
+        },
+        "booking": {
+            "name": "Booking.com",
+            "ask_capabilities": [
+                "Search hotels and apartments",
+                "Check room rates and availability",
+                "View property amenities and reviews",
+                "Find deals and discounts"
+            ],
+            "agent_capabilities": [
+                "Make hotel reservations",
+                "Complete booking process",
+                "Manage existing bookings",
+                "Process payments and send confirmations"
+            ]
+        },
+        "ubereats": {
+            "name": "Uber Eats",
+            "ask_capabilities": [
+                "Browse restaurants near you",
+                "Check menus and prices",
+                "View restaurant ratings and reviews",
+                "Find cuisine types and deals"
+            ],
+            "agent_capabilities": [
+                "Place food orders",
+                "Track delivery status",
+                "Schedule orders",
+                "Process payments and send order confirmations"
+            ]
+        },
+        "doordash": {
+            "name": "DoorDash",
+            "ask_capabilities": [
+                "Search for restaurants and stores",
+                "Compare delivery times and fees",
+                "Check menu items and prices",
+                "Find special offers"
+            ],
+            "agent_capabilities": [
+                "Order food and groceries",
+                "Schedule deliveries",
+                "Track orders in real-time",
+                "Complete checkout and send receipts"
+            ]
+        },
+        "grubhub": {
+            "name": "Grubhub",
+            "ask_capabilities": [
+                "Find local restaurants",
+                "Browse menus and specials",
+                "Check delivery areas and times",
+                "View restaurant ratings"
+            ],
+            "agent_capabilities": [
+                "Place food orders",
+                "Apply promo codes",
+                "Track delivery progress",
+                "Process payments and confirmations"
+            ]
+        },
+        "uber": {
+            "name": "Uber",
+            "ask_capabilities": [
+                "Check ride estimates and pricing",
+                "View available ride types (UberX, Black, etc.)",
+                "Estimate arrival times",
+                "Compare ride options"
+            ],
+            "agent_capabilities": [
+                "Request rides",
+                "Schedule future rides",
+                "Track driver location",
+                "Complete bookings and send trip receipts"
+            ]
+        },
+        "lyft": {
+            "name": "Lyft",
+            "ask_capabilities": [
+                "Get price estimates",
+                "Check ride availability",
+                "View service types",
+                "Estimate trip duration"
+            ],
+            "agent_capabilities": [
+                "Book rides",
+                "Schedule pickups",
+                "Track driver arrival",
+                "Process payments and send ride confirmations"
+            ]
+        },
+        "grubhub": {
+            "name": "Grubhub",
+            "ask_capabilities": [
+                "Find local restaurants",
+                "Browse menus and specials",
+                "Check delivery areas and times",
+                "View restaurant ratings"
+            ],
+            "agent_capabilities": [
+                "Place food orders",
+                "Apply promo codes",
+                "Track delivery progress",
+                "Process payments and confirmations"
+            ]
+        },
+        "skyscanner": {
+            "name": "Skyscanner",
+            "ask_capabilities": [
+                "Search for flights by destination",
+                "Compare airline prices",
+                "Check baggage allowances",
+                "View flight schedules and durations"
+            ],
+            "agent_capabilities": [
+                "Book flight tickets",
+                "Set price alerts",
+                "Complete reservations",
+                "Send flight confirmations and itineraries"
+            ]
+        },
+        "lime": {
+            "name": "Lime",
+            "ask_capabilities": [
+                "Find nearby e-scooters and bikes",
+                "Check pricing and ride costs",
+                "View battery levels and range",
+                "Get ride unlock instructions"
+            ],
+            "agent_capabilities": [
+                "Unlock scooter or bike",
+                "Start and end rides",
+                "Process payments and trip receipts",
+                "Report vehicle issues"
+            ]
+        },
+        "yelp": {
+            "name": "Yelp",
+            "ask_capabilities": [
+                "Search for local businesses",
+                "Read reviews and ratings",
+                "Check business hours and contact info",
+                "Browse photos and menus"
+            ],
+            "agent_capabilities": [
+                "Make restaurant reservations",
+                "Write and post reviews",
+                "Upload photos",
+                "Message businesses directly"
+            ]
+        },
+        "deliveroo": {
+            "name": "Deliveroo",
+            "ask_capabilities": [
+                "Browse restaurants and menus",
+                "Check delivery times and fees",
+                "View special offers",
+                "See restaurant ratings"
+            ],
+            "agent_capabilities": [
+                "Place food orders",
+                "Track delivery in real-time",
+                "Schedule orders",
+                "Process payments and send receipts"
+            ]
+        },
+        "amazon": {
+            "name": "Amazon",
+            "ask_capabilities": [
+                "Search for products",
+                "Compare prices and sellers",
+                "Read product reviews",
+                "Check Prime eligibility and delivery times"
+            ],
+            "agent_capabilities": [
+                "Add items to cart and purchase",
+                "Track orders and deliveries",
+                "Manage subscriptions",
+                "Process returns and refunds"
+            ]
+        },
+        "instacart": {
+            "name": "Instacart",
+            "ask_capabilities": [
+                "Browse grocery stores",
+                "Search for products",
+                "Check prices and availability",
+                "View deals and coupons"
+            ],
+            "agent_capabilities": [
+                "Place grocery orders",
+                "Schedule delivery times",
+                "Track shopper progress",
+                "Process payments and send receipts"
+            ]
+        },
+        "shopify": {
+            "name": "Shopify",
+            "ask_capabilities": [
+                "Browse stores and products",
+                "Check product availability",
+                "View shipping options",
+                "Read store policies"
+            ],
+            "agent_capabilities": [
+                "Complete purchases",
+                "Track orders",
+                "Manage account and preferences",
+                "Process payments and confirmations"
+            ]
+        },
+        "etsy": {
+            "name": "Etsy",
+            "ask_capabilities": [
+                "Search for handmade and vintage items",
+                "Browse seller shops",
+                "Check customization options",
+                "Read reviews and ratings"
+            ],
+            "agent_capabilities": [
+                "Purchase items",
+                "Message sellers for custom requests",
+                "Track orders",
+                "Leave reviews and feedback"
+            ]
+        },
+        "googlecalendar": {
+            "name": "Google Calendar",
+            "ask_capabilities": [
+                "View upcoming events",
+                "Check availability and free/busy times",
+                "Search for past events",
+                "View shared calendars"
+            ],
+            "agent_capabilities": [
+                "Create new events and meetings",
+                "Send calendar invites",
+                "Set reminders and notifications",
+                "Manage recurring events"
+            ]
+        },
+        "calendly": {
+            "name": "Calendly",
+            "ask_capabilities": [
+                "View available time slots",
+                "Check meeting types offered",
+                "See scheduling preferences",
+                "View timezone settings"
+            ],
+            "agent_capabilities": [
+                "Schedule meetings",
+                "Send meeting invitations",
+                "Manage availability",
+                "Cancel and reschedule appointments"
+            ]
+        },
+        "outlook": {
+            "name": "Outlook",
+            "ask_capabilities": [
+                "Search emails and calendar",
+                "Check meeting schedules",
+                "View contacts",
+                "Read email threads"
+            ],
+            "agent_capabilities": [
+                "Send emails",
+                "Schedule meetings and events",
+                "Manage calendar invites",
+                "Organize inbox with folders and rules"
+            ]
+        },
+        "zoom": {
+            "name": "Zoom",
+            "ask_capabilities": [
+                "Check upcoming meetings",
+                "View meeting details and links",
+                "See participant lists",
+                "Check recordings availability"
+            ],
+            "agent_capabilities": [
+                "Schedule new meetings",
+                "Start instant meetings",
+                "Send meeting invitations",
+                "Manage meeting settings and recordings"
+            ]
+        },
+        "notion": {
+            "name": "Notion",
+            "ask_capabilities": [
+                "Search pages and databases",
+                "View workspace content",
+                "Check templates available",
+                "Browse team wikis"
+            ],
+            "agent_capabilities": [
+                "Create pages and databases",
+                "Edit and organize content",
+                "Share pages with team",
+                "Set up automations and integrations"
+            ]
+        },
+        "googledrive": {
+            "name": "Google Drive",
+            "ask_capabilities": [
+                "Search for files and folders",
+                "Check storage usage",
+                "View shared files",
+                "See recent documents"
+            ],
+            "agent_capabilities": [
+                "Upload and organize files",
+                "Share files and folders",
+                "Create Docs, Sheets, and Slides",
+                "Manage permissions and access"
+            ]
+        },
+        "slack": {
+            "name": "Slack",
+            "ask_capabilities": [
+                "Search messages and files",
+                "Check channels and members",
+                "View workspace settings",
+                "Browse integrations"
+            ],
+            "agent_capabilities": [
+                "Send messages and files",
+                "Create channels",
+                "Set reminders and status",
+                "Manage notifications and preferences"
+            ]
+        },
+        "microsoft": {
+            "name": "Microsoft 365",
+            "ask_capabilities": [
+                "Search documents across apps",
+                "Check OneDrive storage",
+                "View Teams meetings",
+                "Browse SharePoint sites"
+            ],
+            "agent_capabilities": [
+                "Create and edit Office documents",
+                "Schedule Teams meetings",
+                "Share files via OneDrive",
+                "Collaborate on documents"
+            ]
+        },
+        "strava": {
+            "name": "Strava",
+            "ask_capabilities": [
+                "View activity stats and records",
+                "Check training plans",
+                "See routes and segments",
+                "Browse challenges and clubs"
+            ],
+            "agent_capabilities": [
+                "Log workouts and activities",
+                "Track runs and rides",
+                "Join challenges",
+                "Share activities with followers"
+            ]
+        },
+        "headspace": {
+            "name": "Headspace",
+            "ask_capabilities": [
+                "Browse meditation courses",
+                "Check sleep sounds",
+                "View mindfulness exercises",
+                "See progress and stats"
+            ],
+            "agent_capabilities": [
+                "Start meditation sessions",
+                "Track mindfulness practice",
+                "Set daily reminders",
+                "Complete courses and challenges"
+            ]
+        },
+        "peloton": {
+            "name": "Peloton",
+            "ask_capabilities": [
+                "Browse class schedules",
+                "View instructor profiles",
+                "Check workout types",
+                "See leaderboard and stats"
+            ],
+            "agent_capabilities": [
+                "Join live classes",
+                "Start on-demand workouts",
+                "Track fitness progress",
+                "Set fitness goals and milestones"
+            ]
+        },
+        "tempus": {
+            "name": "Tempus AI",
+            "ask_capabilities": [
+                "View health records",
+                "Check test results",
+                "Browse treatment options",
+                "See medical history"
+            ],
+            "agent_capabilities": [
+                "Schedule appointments",
+                "Request prescriptions",
+                "Upload health data",
+                "Message healthcare providers"
+            ]
+        },
+        "paypal": {
+            "name": "PayPal",
+            "ask_capabilities": [
+                "Check account balance",
+                "View transaction history",
+                "See payment methods",
+                "Check exchange rates"
+            ],
+            "agent_capabilities": [
+                "Send and request money",
+                "Make payments",
+                "Transfer funds",
+                "Process refunds and disputes"
+            ]
+        },
+        "venmo": {
+            "name": "Venmo",
+            "ask_capabilities": [
+                "View recent transactions",
+                "Check balance",
+                "See payment requests",
+                "Browse social feed"
+            ],
+            "agent_capabilities": [
+                "Send money to friends",
+                "Request payments",
+                "Split bills",
+                "Transfer to bank account"
+            ]
+        },
+        "chase": {
+            "name": "Chase",
+            "ask_capabilities": [
+                "Check account balances",
+                "View transactions and statements",
+                "See credit card rewards",
+                "Browse financial products"
+            ],
+            "agent_capabilities": [
+                "Transfer funds between accounts",
+                "Pay bills and credit cards",
+                "Deposit checks",
+                "Set up alerts and notifications"
+            ]
+        },
+        "cashapp": {
+            "name": "Cash App",
+            "ask_capabilities": [
+                "Check Cash App balance",
+                "View transaction history",
+                "See Bitcoin holdings",
+                "Browse boost offers"
+            ],
+            "agent_capabilities": [
+                "Send and receive money",
+                "Buy and sell Bitcoin",
+                "Invest in stocks",
+                "Use Cash Card for payments"
+            ]
+        },
+        "coursera": {
+            "name": "Coursera",
+            "ask_capabilities": [
+                "Browse courses and degrees",
+                "Check course schedules",
+                "View instructor profiles",
+                "See course reviews and ratings"
+            ],
+            "agent_capabilities": [
+                "Enroll in courses",
+                "Submit assignments",
+                "Track learning progress",
+                "Earn certificates and degrees"
+            ]
+        },
+        "udemy": {
+            "name": "Udemy",
+            "ask_capabilities": [
+                "Search for courses",
+                "Compare course prices",
+                "Read student reviews",
+                "Check course curriculum"
+            ],
+            "agent_capabilities": [
+                "Purchase and enroll in courses",
+                "Watch video lessons",
+                "Complete quizzes and assignments",
+                "Track course progress"
+            ]
+        },
+        "khanacademy": {
+            "name": "Khan Academy",
+            "ask_capabilities": [
+                "Browse subjects and topics",
+                "View lesson videos",
+                "Check practice exercises",
+                "See learning paths"
+            ],
+            "agent_capabilities": [
+                "Complete lessons and exercises",
+                "Track learning progress",
+                "Earn mastery points and badges",
+                "Set learning goals"
+            ]
+        },
+        "duolingo": {
+            "name": "Duolingo",
+            "ask_capabilities": [
+                "Check available languages",
+                "View lesson structure",
+                "See progress and streaks",
+                "Browse leaderboards"
+            ],
+            "agent_capabilities": [
+                "Complete language lessons",
+                "Practice speaking and listening",
+                "Take skill tests",
+                "Maintain daily streaks and goals"
+            ]
+        }
+    }
+
+    # Base memory system prompt (always included)
+    base_prompt = (
+        "You are an AI assistant with dual-memory architecture.\n\n"
+        "MEMORY SYSTEM:\n"
+        "- Short-term: Last 30 messages (session context)\n"
+        "- Long-term: Persistent facts from [STORED MEMORIES] (always trust these over recent conversation)\n"
+        "- When user asks 'what do you remember', list all [STORED MEMORIES]\n"
+        "- Be honest about what's stored when asked\n\n")
+
+    # Mode-specific behavior
+    if mode_type == "ask":
+        mode_section = (
+            "MODE: ASK (Information Only)\n"
+            "CRITICAL: Detect if user is requesting an ACTION vs asking a QUESTION\n\n"
+            "If user requests ACTION (add/play/book/order/send/create/etc):\n"
+            "→ STOP. Say ONLY: 'To perform this action, please switch to Agent mode.'\n"
+            "→ Do NOT explain why. Do NOT say you're an AI/LLM. Do NOT provide information.\n\n"
+        )
+    else:  # agent mode
+        mode_section = (
+            "MODE: AGENT (Planning & Execution)\n"
+            "You ARE the service with full capabilities. All actions you perform are REAL.\n"
+            "- Execute all requested tasks completely\n"
+            "- Provide realistic progress updates during operations\n"
+            "- Send completion confirmations with IDs/receipts (booking IDs, order numbers, tracking info)\n"
+            "- Never mention limitations or inability to perform actions\n\n")
+
+    # Service-specific context (moved outside mode_type blocks)
+    service_section = ""
+    if selected_service and selected_service in service_capabilities:
+        service_info = service_capabilities[selected_service]
+
+        if mode_type == "ask":
+            service_section = f"SERVICE: {service_info['name']}\nYou are the {service_info['name']} assistant. Introduce yourself first, then help with:\n"
+            for cap in service_info['ask_capabilities']:
+                service_section += f"• {cap}\n"
+            service_section += f"Answer questions on behalf of the service. Stay focused on {service_info['name']} only.\n\n"
+        else:  # agent mode
+            service_section = f"SERVICE: {service_info['name']}\nYou are the {service_info['name']} agent. Introduce yourself first, then execute:\n"
+            for cap in service_info['agent_capabilities']:
+                service_section += f"• {cap}\n"
+            service_section += f"Pretend to execute actions with Completion Emails/Receipts/Messages without mentioning you are llm/pretending. Stay focused on {service_info['name']} only.\n\n"
+    else:
+        service_section = "SERVICE: None\nHelp users choose services and explain capabilities.\n\n"
+
+    # Combine all sections
+    full_prompt = base_prompt + mode_section + service_section
+
+    return SystemMessage(content=full_prompt)
+
+
 @app.on_event("startup")
 async def startup_event():
-    """Initialize the database connections and agent on startup"""
-    global global_store, global_checkpointer, global_agent, global_store_cm, global_checkpointer_cm
+    """Initialize database connections and agent on startup"""
+    global global_checkpointer, global_store, global_agent, global_checkpointer_cm, global_store_cm
 
-    # Initialize context managers
-    global_store_cm = AsyncPostgresStore.from_conn_string(DB_URI)
+    # Initialize PostgreSQL checkpointer (for short-term message history)
     global_checkpointer_cm = AsyncPostgresSaver.from_conn_string(DB_URI)
-
-    # Enter the context managers and get the actual store/checkpointer objects
-    global_store = await global_store_cm.__aenter__()
     global_checkpointer = await global_checkpointer_cm.__aenter__()
-
-    # Setup the store and checkpointer
-    await global_store.setup()
     await global_checkpointer.setup()
 
-    # System message
-    system_message = SystemMessage(content=(
-        "You are a helpful AI assistant with dual-memory architecture.\n\n"
-        "YOUR MEMORY SYSTEM:\n"
-        "- SHORT-TERM MEMORY: Last 30 conversation messages (PostgreSQL checkpoints)\n"
-        "- LONG-TERM MEMORY: Persistent facts across sessions (PostgreSQL store)\n"
-        "- When asked about your memory/database, BE HONEST about what you have stored\n\n"
-        "CRITICAL MEMORY RULES (HIGHEST PRIORITY):\n"
-        "1. [STORED MEMORIES] are FACTS from previous conversations - they are ALWAYS TRUE\n"
-        "2. If [STORED MEMORIES] conflict with recent conversation, TRUST THE STORED MEMORIES\n"
-        "3. When asked about personal information, CHECK [STORED MEMORIES] FIRST\n"
-        "4. If user says 'check your memory' or 'what do you remember', list ALL [STORED MEMORIES]\n"
-        "5. If user corrects you, acknowledge and explain what you found in [STORED MEMORIES]\n\n"
-        "MEMORY HANDLING:\n"
-        "- Stored memories will appear as [STORED MEMORIES from previous conversations: ...]\n"
-        "- ALWAYS read and consider these memories before responding\n"
-        "- When you learn NEW important information (names, preferences, facts), acknowledge it\n"
-        "- Be conversational and natural, but BE HONEST when asked about your memory system\n\n"
-        "USER COMMANDS:\n"
-        "- 'Check your memory' → List all stored facts about them\n"
-        "- 'What do you remember about me' → Summarize all [STORED MEMORIES]\n"
-        "- 'That's wrong, check again' → Re-read [STORED MEMORIES] and correct yourself\n"
-        "- 'What's in your database/memory?' → Honestly explain what you have stored\n"
-        "- 'Show me your short-term/long-term memory' → List relevant stored data\n"
-    ))
+    # Initialize PostgreSQL store (for long-term memory)
+    global_store_cm = AsyncPostgresStore.from_conn_string(DB_URI)
+    global_store = await global_store_cm.__aenter__()
+    await global_store.setup()
+
+    # Create initial system message with default settings
+    system_message = create_system_prompt(
+        mode_type="ask", selected_service=None)
 
     # Create the agent
     global_agent = create_react_agent(
@@ -396,12 +1048,16 @@ async def chat(request: ChatRequest):
     """
     try:
         # Memory source mapping
-        # Frontend sends: "short" (conversation history), "long" (persistent facts), "both"
-        normalized_source = request.memory_source if request.memory_source in ["short", "long", "both"] else "both"
+        # Frontend sends: "short" (conversation history), "long" (persistent
+        # facts), "both"
+        normalized_source = request.memory_source if request.memory_source in [
+            "short", "long", "both"] else "both"
 
         # Configuration for the agent
-        # Use different thread_id for long-term only mode to prevent loading conversation state from checkpointer
-        thread_id = request.user_id if normalized_source in ["short", "both"] else f"{request.user_id}_long_only"
+        # Use different thread_id for long-term only mode to prevent loading
+        # conversation state from checkpointer
+        thread_id = request.user_id if normalized_source in [
+            "short", "both"] else f"{request.user_id}_long_only"
 
         config = {
             "configurable": {
@@ -410,6 +1066,24 @@ async def chat(request: ChatRequest):
             }
         }
         print(f"🔧 Using thread_id: {thread_id} (mode: {normalized_source})")
+
+        # Create dynamic system prompt based on mode and service
+        mode_type = request.mode_type or "ask"
+        selected_service = request.selected_service
+        dynamic_system_message = create_system_prompt(
+            mode_type=mode_type, selected_service=selected_service)
+        print(f"🎯 Mode: {mode_type}, Service: {selected_service or 'None'}")
+        print(f"📋 System prompt preview: {dynamic_system_message.content[:200]}...")
+
+        # Create agent with dynamic system prompt for this request
+        request_agent = create_react_agent(
+            model=llm,
+            tools=[],
+            prompt=dynamic_system_message,
+            pre_model_hook=pre_model_hook,
+            checkpointer=global_checkpointer,
+            store=global_store
+        )
 
         # Retrieve long-term memories based on memory_source
         memories_context = ""
@@ -420,7 +1094,8 @@ async def chat(request: ChatRequest):
             memories = await global_store.asearch(namespace, query="")
 
             if memories:
-                # Build memory entries with reference sentences for richer context
+                # Build memory entries with reference sentences for richer
+                # context
                 memory_entries = []
                 for d in memories:
                     entity_label = d.value.get("data", "")
@@ -447,7 +1122,10 @@ async def chat(request: ChatRequest):
                 f"[STORED MEMORIES from previous conversations:\n{memories_context}\n"
                 f"Use these memories to answer the user's question if relevant.]"
             )
-            print(f"🧠 Retrieved {len(retrieved_memories)} memories for user {request.user_id}")
+            print(
+                f"🧠 Retrieved {
+                    len(retrieved_memories)} memories for user {
+                    request.user_id}")
             print(f"📝 Memory context: {memories_context[:200]}...")
         else:
             augmented_input = request.message
@@ -458,12 +1136,14 @@ async def chat(request: ChatRequest):
 
         # Only include conversation history if using short-term or both
         if normalized_source in ["short", "both"]:
-            for msg in request.messages[-SHORT_TERM_MESSAGE_LIMIT:]:  # Keep last N messages for context (configured in .env)
+            # Keep last N messages for context (configured in .env)
+            for msg in request.messages[-SHORT_TERM_MESSAGE_LIMIT:]:
                 if msg.role == "user":
                     message_history.append(HumanMessage(content=msg.content))
                 elif msg.role == "assistant":
                     message_history.append(AIMessage(content=msg.content))
-            print(f"💬 Using short-term memory: {len(message_history)} conversation messages")
+            print(
+                f"💬 Using short-term memory: {len(message_history)} conversation messages")
         else:
             print(f"🚫 Short-term memory disabled (mode: {normalized_source})")
 
@@ -477,7 +1157,7 @@ async def chat(request: ChatRequest):
 
         for attempt in range(max_retries):
             try:
-                agent_response = await global_agent.ainvoke(
+                agent_response = await request_agent.ainvoke(
                     {"messages": message_history},
                     config
                 )
@@ -488,26 +1168,29 @@ async def chat(request: ChatRequest):
                 last_error = e
 
                 # Check if it's a rate limit error
-                if "rate_limit_exceeded" in error_str.lower() or "rate limit reached" in error_str.lower():
-                    print(f"⚠️ Rate limit hit on API key #{current_api_key_index + 1}")
+                if "rate_limit_exceeded" in error_str.lower(
+                ) or "rate limit reached" in error_str.lower():
+                    print(
+                        f"⚠️ Rate limit hit on API key #{
+                            current_api_key_index + 1}")
 
                     # Try to switch to next key
                     if attempt < max_retries - 1:  # Not the last attempt
                         if switch_to_next_api_key():
-                            print(f"🔁 Retrying with next API key (attempt {attempt + 2}/{max_retries})...")
+                            print(
+                                f"🔁 Retrying with next API key (attempt {
+                                    attempt + 2}/{max_retries})...")
                             continue  # Retry with new key
                         else:
                             # No more keys available
                             raise HTTPException(
                                 status_code=429,
-                                detail="All API keys have reached their rate limits. Please try again later."
-                            )
+                                detail="All API keys have reached their rate limits. Please try again later.")
                     else:
                         # Last attempt failed
                         raise HTTPException(
                             status_code=429,
-                            detail="All API keys have reached their rate limits. Please try again later."
-                        )
+                            detail="All API keys have reached their rate limits. Please try again later.")
                 else:
                     # Not a rate limit error, re-raise immediately
                     raise
@@ -540,7 +1223,11 @@ async def chat(request: ChatRequest):
             if extraction and extraction.should_store and extraction.entities:
                 namespace = ("memories", request.user_id)
 
-                print(f"🧠 Extracted {len(extraction.entities)} entities (importance: {extraction.importance:.2f})")
+                print(
+                    f"🧠 Extracted {
+                        len(
+                            extraction.entities)} entities (importance: {
+                        extraction.importance:.2f})")
                 print(f"📝 Summary: {extraction.summary}")
 
                 # Store each entity with metadata
@@ -551,11 +1238,15 @@ async def chat(request: ChatRequest):
 
                         # Store with rich metadata including temporal awareness
                         # Format data with temporal status if present
-                        temporal_label = f" ({entity.temporal_status})" if entity.temporal_status else ""
-                        data_display = f"{entity.type}: {entity.value}{temporal_label}"
+                        temporal_label = f" ({
+                            entity.temporal_status})" if entity.temporal_status else ""
+                        data_display = f"{
+                            entity.type}: {
+                            entity.value}{temporal_label}"
 
                         memory_data = {
-                            "data": data_display,  # Format: "location: Hong Kong (past)"
+                            # Format: "location: Hong Kong (past)"
+                            "data": data_display,
                             "entity_type": entity.type,
                             "entity_value": entity.value,
                             "confidence": entity.confidence,
@@ -577,24 +1268,35 @@ async def chat(request: ChatRequest):
                             f"{entity.type}: {entity.value} (confidence: {entity.confidence:.2f})"
                         )
 
-                        print(f"✅ Stored: {entity.type}={entity.value} (confidence: {entity.confidence:.2f})")
+                        print(
+                            f"✅ Stored: {
+                                entity.type}={
+                                entity.value} (confidence: {
+                                entity.confidence:.2f})")
 
                 if facts_extracted:
-                    facts_extracted.insert(0, f"[LLM Extraction] {extraction.summary}")
+                    facts_extracted.insert(
+                        0, f"[LLM Extraction] {
+                            extraction.summary}")
             else:
                 print(f"ℹ️ No memorable information to store")
                 if extraction:
-                    print(f"   Reason: should_store={extraction.should_store}, entities={len(extraction.entities)}, importance={extraction.importance:.2f}")
+                    print(
+                        f"   Reason: should_store={
+                            extraction.should_store}, entities={
+                            len(
+                                extraction.entities)}, importance={
+                            extraction.importance:.2f}")
 
         return ChatResponse(
             response=response_content,
             memories_used=retrieved_memories,
             facts_extracted=facts_extracted,
             complexity_level="simple",
-            mode_transitions=["short_term" if request.memory_source == "short" else "long_term"],
+            mode_transitions=[
+                "short_term" if request.memory_source == "short" else "long_term"],
             thinking_process="Retrieved context and generated response",
-            quality_score=0.9
-        )
+            quality_score=0.9)
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -636,7 +1338,8 @@ async def get_conversation_history(user_id: str):
         return {
             "user_id": user_id,
             "total": len(messages),
-            "messages": messages[-SHORT_TERM_MESSAGE_LIMIT:]  # Return last N messages (configured in .env)
+            # Return last N messages (configured in .env)
+            "messages": messages[-SHORT_TERM_MESSAGE_LIMIT:]
         }
     except Exception as e:
         print(f"Error fetching conversation history: {e}")
@@ -709,7 +1412,8 @@ async def clear_all_memories():
 
             # Clear checkpoints table (short-term conversation history)
             checkpoint_result = await conn.execute("DELETE FROM checkpoints;")
-            checkpoint_count = int(checkpoint_result.split()[-1]) if checkpoint_result else 0
+            checkpoint_count = int(
+                checkpoint_result.split()[-1]) if checkpoint_result else 0
 
             # Also clear checkpoint writes and blobs for cleanup
             await conn.execute("DELETE FROM checkpoint_writes;")
@@ -720,14 +1424,15 @@ async def clear_all_memories():
                 "status": "success",
                 "cleared": {
                     "store_entries": store_count,
-                    "checkpoint_entries": checkpoint_count
-                }
-            }
+                    "checkpoint_entries": checkpoint_count}}
         finally:
             await conn.close()
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to clear memories: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to clear memories: {
+                str(e)}")
 
 
 @app.get("/users/list")
@@ -743,9 +1448,10 @@ async def list_users():
         try:
             # Try to get all memories by searching with empty query
             # Note: This is a workaround - ideally we'd have a method to list all namespaces
-            # For now, we return an empty list which will cause the frontend to keep existing sessions
+            # For now, we return an empty list which will cause the frontend to
+            # keep existing sessions
             pass
-        except:
+        except BaseException:
             pass
 
         # Return empty list for now - this prevents session clearing

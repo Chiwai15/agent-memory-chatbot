@@ -8,6 +8,69 @@ A production-ready AI agent system with dual-memory architecture (short-term + l
 
 ---
 
+## ✅ System Verification
+
+After setup, verify the system is working correctly:
+
+### 1. Database Check
+```bash
+docker ps | grep postgres
+# Should show: memory_chatbot_db running
+
+psql postgresql://postgres:postgres@localhost:5432/postgres -c "\dt"
+# Should show: checkpoints, store tables
+```
+
+### 2. Backend Health Check
+```bash
+curl http://localhost:8000/
+# Expected: {"status":"ok","message":"Memory Chat API is running"}
+
+curl http://localhost:8000/users/list
+# Expected: {"users":[]} (empty list if no users yet)
+```
+
+### 3. Memory System Test
+Test both short-term and long-term memory:
+```
+1. Chat: "My name is Alice and I love pizza"
+   ✓ Should respond acknowledging the information
+
+2. Chat: "What's my name?"
+   ✓ Should respond: "Your name is Alice"
+
+3. Refresh the page (simulates new session)
+
+4. Chat: "What do you remember about me?"
+   ✓ Should recall: "You're Alice and you love pizza"
+   ✓ Verifies long-term memory persistence
+```
+
+### 4. Multi-User Isolation Test
+```
+1. Session 1: "My name is Alice"
+2. Create new session (+ button)
+3. Session 2: "My name is Bob"
+4. Switch back to Session 1
+5. Ask: "What's my name?"
+   ✓ Should say "Alice" (not Bob!)
+   ✓ Verifies session isolation
+```
+
+### 5. Database Inspection
+```bash
+# View stored memories
+curl "http://localhost:8000/memories/all/inspect?user_id=test-user"
+
+# Should show JSON with:
+# - checkpoints: Recent conversation messages
+# - store: Extracted entities (names, preferences, etc.)
+```
+
+**If all tests pass, your system is correctly configured!** ✅
+
+---
+
 ## ✨ Features
 
 - **Dual-Memory System**: Short-term (30 messages) + Long-term (unlimited persistent entities)
@@ -193,14 +256,22 @@ PostgreSQL (localhost:5432)
 ```
 agent-memory-chatbot/
 ├── README.md                    # This file
+├── RAILWAY_DEPLOYMENT.md        # Railway deployment guide
 ├── server.py                    # FastAPI backend
 ├── requirements.txt             # Python dependencies
-├── docker-compose.yml           # PostgreSQL setup
+├── Dockerfile                   # Backend Docker image
+├── .dockerignore                # Docker ignore rules
+├── railway.json                 # Railway configuration
+├── docker-compose.yml           # Full stack local development
 ├── .env.example                 # Environment template
 ├── 01_shortTermTest.py          # Short-term memory demo
 ├── 02_longTermTest.py           # Long-term memory demo
 ├── inspect_schema.py            # Database schema inspector
 ├── chatbot-ui/                  # React frontend
+│   ├── Dockerfile               # Frontend Docker image
+│   ├── .dockerignore            # Frontend Docker ignore
+│   ├── railway.json             # Frontend Railway config
+│   ├── nginx.conf               # Nginx configuration
 │   ├── src/
 │   │   ├── components/
 │   │   │   └── ChatInterface.jsx
@@ -388,16 +459,50 @@ lsof -ti:5173 | xargs kill -9
 
 ## 🚀 Deployment
 
-For production deployment, see:
-- **[Production Deployment Guide](docs/deployment/PRODUCTION_DEPLOYMENT.md)** - Complete guide for AWS, GCP, Docker, Kubernetes
+### Railway (Recommended)
 
-Key recommendations:
-- Use managed PostgreSQL (AWS RDS, Google Cloud SQL, etc.)
+This project is optimized for Railway deployment with Docker:
+
+1. **[Railway Deployment Guide](RAILWAY_DEPLOYMENT.md)** - Step-by-step guide for Railway
+2. **Quick Deploy**:
+   - Push to GitHub
+   - Connect Railway to your repo
+   - Add PostgreSQL database
+   - Deploy backend and frontend services
+   - Configure environment variables
+
+**Railway Benefits:**
+- Free tier with $5/month credit
+- Automatic Docker deployment
+- Managed PostgreSQL included
+- Zero-config deployments
+- Built-in CI/CD from GitHub
+
+### Other Platforms
+
+For alternative platforms, see:
+- **[Production Deployment Guide](docs/deployment/PRODUCTION_DEPLOYMENT.md)** - AWS, GCP, Docker, Kubernetes
+
+**Key recommendations:**
+- Use managed PostgreSQL (AWS RDS, Google Cloud SQL, Railway PostgreSQL)
 - Set proper CORS origins in `server.py`
 - Use environment variables for all secrets
 - Build frontend: `cd chatbot-ui && npm run build`
-- Deploy backend with process manager (gunicorn, systemd)
 - Use HTTPS with SSL certificates
+
+### Docker Deployment
+
+The project includes complete Docker setup:
+
+```bash
+# Build and run all services
+docker-compose up --build
+
+# Services:
+# - PostgreSQL: localhost:5432
+# - Backend API: localhost:8000
+# - Frontend: localhost:80
+```
 
 ---
 
@@ -439,4 +544,4 @@ Built with:
 
 **Built with ❤️ using LangGraph, FastAPI, React, and PostgreSQL**
 
-**Last Updated**: 2025-11-16
+**Last Updated**: 2025-11-17
