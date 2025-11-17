@@ -628,17 +628,41 @@ async def delete_user_memories(user_id: str):
 
 @app.delete("/memories/all/clear")
 async def clear_all_memories():
-    """Clear all memories from all users (PostgreSQL store only)"""
+    """Clear all memories AND checkpoints from all users (PostgreSQL store + checkpoints)"""
     try:
-        # Note: This is a simplified version
-        # In production, you'd need to properly clear the PostgreSQL store
-        # For now, just return success message
-        return {
-            "message": "All memories cleared from PostgreSQL",
-            "status": "success"
-        }
+        # Step 1: Clear all long-term memories from store table
+        # We need to search through all possible namespaces and delete them
+        # Since we can't easily iterate all namespaces, we'll use raw SQL
+        import asyncpg
+
+        conn = await asyncpg.connect(DB_URI)
+
+        try:
+            # Clear store table (long-term memories)
+            store_result = await conn.execute("DELETE FROM store;")
+            store_count = int(store_result.split()[-1]) if store_result else 0
+
+            # Clear checkpoints table (short-term conversation history)
+            checkpoint_result = await conn.execute("DELETE FROM checkpoints;")
+            checkpoint_count = int(checkpoint_result.split()[-1]) if checkpoint_result else 0
+
+            # Also clear checkpoint writes and blobs for cleanup
+            await conn.execute("DELETE FROM checkpoint_writes;")
+            await conn.execute("DELETE FROM checkpoint_blobs;")
+
+            return {
+                "message": "All memories and conversations cleared successfully",
+                "status": "success",
+                "cleared": {
+                    "store_entries": store_count,
+                    "checkpoint_entries": checkpoint_count
+                }
+            }
+        finally:
+            await conn.close()
+
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Failed to clear memories: {str(e)}")
 
 
 @app.get("/users/list")

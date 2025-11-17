@@ -353,10 +353,18 @@ function ChatInterface() {
       if (response.ok) {
         const data = await response.json();
         console.log('All memories cleared:', data);
-        alert(`✅ Successfully cleared all memories from PostgreSQL!`);
+
+        // Show detailed clear results
+        const storeCount = data.cleared?.store_entries || 0;
+        const checkpointCount = data.cleared?.checkpoint_entries || 0;
+        alert(`✅ Successfully cleared all data!\n\n` +
+              `Long-term memories: ${storeCount} entries\n` +
+              `Conversation history: ${checkpointCount} entries\n\n` +
+              `Database is now clean for public testing.`);
+
         fetchDebugData(); // Refresh debug panel
 
-        // Also clear all local sessions
+        // Also clear all local sessions and localStorage
         const newSession = {
           id: 'user_' + Math.random().toString(36).substr(2, 9),
           name: 'Session 1',
@@ -364,6 +372,12 @@ function ChatInterface() {
         };
         setSessions([newSession]);
         setActiveSessionId(newSession.id);
+        setMessages([]); // Clear messages in UI
+        localStorage.clear(); // Clear ALL localStorage for thorough cleanup
+
+        // Reinitialize sessions in localStorage
+        localStorage.setItem('memorybank_sessions', JSON.stringify([newSession]));
+        localStorage.setItem('memorybank_activeSessionId', newSession.id);
       } else {
         throw new Error('Failed to clear backend memories');
       }
@@ -987,7 +1001,7 @@ function ChatInterface() {
                       color: penseiveView === 'short' ? 'white' : colors.text
                     }}
                   >
-                    💬 Short-term (Last 30)
+                    💬 Short-term
                   </button>
                   <button
                     onClick={() => setPenseiveView('long')}
@@ -997,7 +1011,7 @@ function ChatInterface() {
                       color: penseiveView === 'long' ? 'white' : colors.text
                     }}
                   >
-                    💾 Long-term (Entities)
+                    💾 Long-term
                   </button>
                 </div>
               )}
@@ -1069,9 +1083,6 @@ function ChatInterface() {
                         <div className="flex items-center justify-between">
                           <div className="text-xs font-semibold uppercase tracking-wider" style={{ color: colors.text }}>
                             Long-term Memory (Entities)
-                          </div>
-                          <div className="text-xs px-2 py-1 rounded" style={{ backgroundColor: colors.hover, color: colors.textLight }}>
-                            Phase 1
                           </div>
                         </div>
 
