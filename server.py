@@ -294,11 +294,13 @@ Analyze the conversation and respond with ONLY valid JSON:"""
 
         # Create dedicated LLM for memory extraction with higher token limit
         # (Memory extraction needs more tokens to return complete JSON)
+        # Use first API key for extraction (reset after potential rotation)
+        extraction_key_index = current_api_key_index % len(API_KEYS)  # Ensure valid index
         extraction_llm = init_chat_model(
             model=os.getenv("LLM_MODEL", "openai:gpt-4"),
             temperature=0.3,  # Lower temperature for more structured output
             base_url=os.getenv("OPENAI_API_BASE", "https://api.openai.com/v1"),
-            api_key=API_KEYS[current_api_key_index],
+            api_key=API_KEYS[extraction_key_index],
             model_kwargs={"max_tokens": 500}  # Enough for JSON with multiple entities
         )
 
