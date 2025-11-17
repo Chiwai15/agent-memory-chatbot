@@ -310,15 +310,47 @@ function ChatInterface() {
           message: input,
           user_id: userId,
           memory_source: memorySource, // Send memory source preference
-          messages: messages.map(msg => ({
-            role: msg.role,
-            content: msg.content
-          }))
+          messages: messages
+            .filter(msg => !msg.isError && !msg.isTyping) // Exclude error messages and typing indicators from memory
+            .map(msg => ({
+              role: msg.role,
+              content: msg.content
+            }))
         }),
       });
 
       if (!response.ok) {
-        throw new Error('Failed to get response');
+        // Try to parse error details for better user feedback
+        let errorData;
+        try {
+          errorData = await response.json();
+        } catch (e) {
+          throw new Error('Failed to get response');
+        }
+
+        // Check for rate limit error
+        if (errorData?.detail?.includes('rate_limit_exceeded') ||
+            errorData?.detail?.includes('Rate limit reached')) {
+
+          // Extract wait time if available
+          const waitTimeMatch = errorData.detail.match(/Please try again in ([^.]+)/);
+          const waitTime = waitTimeMatch ? waitTimeMatch[1] : 'a few minutes';
+
+          // Show user-friendly alert
+          alert(`⏱️ Daily usage limit reached!\n\nThe AI service has reached its daily token limit. Please try again in ${waitTime}.\n\nTip: The service resets every 24 hours.`);
+
+          const errorMessage = {
+            role: 'assistant',
+            content: `I've reached my daily usage limit. Please try again in ${waitTime}. The service resets every 24 hours.`,
+            timestamp: new Date().toISOString(),
+            isError: true,
+          };
+          setMessages((prev) => [...prev, errorMessage]);
+          return;
+        }
+
+        // Other errors
+        throw new Error(errorData?.detail || 'Failed to get response');
       }
 
       const data = await response.json();
@@ -341,9 +373,13 @@ function ChatInterface() {
       fetchDebugData();
     } catch (error) {
       console.error('Error sending message:', error);
+
+      // Show user-friendly alert
+      alert('❌ Connection Error\n\nCould not connect to the AI service. Please check:\n\n1. Backend server is running\n2. Internet connection is stable\n3. Try refreshing the page');
+
       const errorMessage = {
         role: 'assistant',
-        content: 'Sorry, I encountered an error. Please make sure the backend is running.',
+        content: 'Sorry, I encountered a connection error. Please make sure the backend server is running and try again.',
         timestamp: new Date().toISOString(),
         isError: true,
       };
@@ -467,6 +503,10 @@ function ChatInterface() {
         }
       }
     }
+  };
+
+  const handleStarterPrompt = (promptText) => {
+    setInput(promptText);
   };
 
   // Auto-play persona messages
@@ -602,7 +642,7 @@ function ChatInterface() {
             <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
             </svg>
-            <span className="flex-1">Demo Mode: Your data is shared and may be modified or deleted by others.</span>
+            <span className="flex-1">Demo Mode: Your messages may be modified or deleted by others. (Shared Rate Limit: 60 req/min)</span>
           </div>
 
           {/* Demo Controls */}
@@ -682,7 +722,7 @@ function ChatInterface() {
               </svg>
             </div>
             <div>
-              <h1 className="text-xl font-bold" style={{ color: colors.text }}>Memorybank</h1>
+              <h1 className="text-xl font-bold" style={{ color: colors.text }}>MemoryBank</h1>
               <p className="text-xs" style={{ color: colors.textLight }}>AI with Memory</p>
             </div>
           </div>
@@ -773,7 +813,7 @@ function ChatInterface() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
                 </svg>
               </div>
-              <h2 className="text-2xl font-bold mb-2" style={{ color: colors.text }}>Welcome to Memorybank</h2>
+              <h2 className="text-2xl font-bold mb-2" style={{ color: colors.text }}>Welcome to MemoryBank</h2>
               <p className="mb-6 text-center max-w-md text-sm" style={{ color: colors.textLight }}>
                 AI assistant with persistent memory powered by vector embeddings
               </p>
