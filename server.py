@@ -292,8 +292,18 @@ If there's NOTHING worth remembering (casual chat, questions, etc.), return:
 
 Analyze the conversation and respond with ONLY valid JSON:"""
 
-        # Use the LLM with structured output
-        response = await llm.ainvoke([
+        # Create dedicated LLM for memory extraction with higher token limit
+        # (Memory extraction needs more tokens to return complete JSON)
+        extraction_llm = init_chat_model(
+            model=os.getenv("LLM_MODEL", "openai:gpt-4"),
+            temperature=0.3,  # Lower temperature for more structured output
+            base_url=os.getenv("OPENAI_API_BASE", "https://api.openai.com/v1"),
+            api_key=API_KEYS[current_api_key_index],
+            model_kwargs={"max_tokens": 500}  # Enough for JSON with multiple entities
+        )
+
+        # Use the dedicated extraction LLM
+        response = await extraction_llm.ainvoke([
             SystemMessage(content="You are a memory extraction expert. Respond ONLY with valid JSON matching the MemoryExtraction schema."),
             HumanMessage(content=extraction_prompt)
         ])
@@ -331,8 +341,15 @@ Analyze the conversation and respond with ONLY valid JSON:"""
             return None
 
     except Exception as e:
-        print(f"Error in extract_memories_with_llm: {e}")
-        return None
+        error_str = str(e)
+        # Check if it's a rate limit error - skip memory extraction gracefully
+        if "rate_limit" in error_str.lower() or "429" in error_str:
+            print(f"Rate limit hit during memory extraction - skipping to save tokens")
+            print(f"Memory extraction will resume when rate limit resets")
+            return None
+        else:
+            print(f"Error in extract_memories_with_llm: {e}")
+            return None
 
 
 # Define a function to create dynamic system prompts based on mode and service
