@@ -35,7 +35,7 @@ API_KEYS = [
         "your-api-key-here").split(",")]
 current_api_key_index = 0
 
-print(f"🔑 Loaded {len(API_KEYS)} API key(s) for rotation")
+print(f"Loaded {len(API_KEYS)} API key(s) for rotation")
 
 # Initialize the LLM with first key
 llm = init_chat_model(
@@ -45,8 +45,8 @@ llm = init_chat_model(
     api_key=API_KEYS[current_api_key_index]
 )
 
-# PostgreSQL connection string
-DB_URI = "postgresql://postgres:postgres@localhost:5432/postgres?sslmode=disable"
+# PostgreSQL connection string - use Railway's DATABASE_URL or fallback to localhost
+DB_URI = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/postgres?sslmode=disable")
 
 # Memory configuration
 SHORT_TERM_MESSAGE_LIMIT = int(os.getenv("SHORT_TERM_MESSAGE_LIMIT", "30"))
@@ -70,7 +70,7 @@ def switch_to_next_api_key():
     next_index = current_api_key_index + 1
 
     if next_index >= len(API_KEYS):
-        print(f"❌ All {len(API_KEYS)} API keys exhausted")
+        print(f"All {len(API_KEYS)} API keys exhausted")
         return False
 
     current_api_key_index = next_index
@@ -93,7 +93,7 @@ def switch_to_next_api_key():
         store=global_store
     )
 
-    print(f"✅ Successfully switched to key #{current_api_key_index + 1}")
+    print(f"Successfully switched to key #{current_api_key_index + 1}")
     return True
 
 
@@ -217,12 +217,12 @@ For each entity, include ALL relevant context in the VALUE field:
 - HOW: Methods or manner if relevant
 
 EXAMPLES OF COMPLETE CONTEXT:
-❌ BAD (Incomplete):
+BAD (Incomplete):
   - fact: "collaborate on lesson plans"
   - preference: "basketball"
   - relationship: "friend"
 
-✅ GOOD (Complete Context):
+GOOD (Complete Context):
   - relationship: "collaborates with Sarah on lesson plans"
   - preference: "plays basketball every Saturday at Central Park"
   - relationship: "childhood friend Mike from Boston"
@@ -309,12 +309,12 @@ Analyze the conversation and respond with ONLY valid JSON:"""
             )
 
         except json.JSONDecodeError as e:
-            print(f"⚠️ Failed to parse LLM response as JSON: {e}")
+            print(f"Failed to parse LLM response as JSON: {e}")
             print(f"Response was: {response.content[:200]}")
             return None
 
     except Exception as e:
-        print(f"⚠️ Error in extract_memories_with_llm: {e}")
+        print(f"Error in extract_memories_with_llm: {e}")
         return None
 
 
@@ -1013,7 +1013,7 @@ async def startup_event():
         store=global_store
     )
 
-    print("✅ Server initialized successfully!")
+    print("Server initialized successfully!")
 
 
 @app.on_event("shutdown")
@@ -1026,7 +1026,7 @@ async def shutdown_event():
     if global_checkpointer_cm:
         await global_checkpointer_cm.__aexit__(None, None, None)
 
-    print("✅ Server shutdown complete")
+    print("Server shutdown complete")
 
 
 @app.get("/")
@@ -1062,15 +1062,15 @@ async def chat(request: ChatRequest):
                 "user_id": request.user_id
             }
         }
-        print(f"🔧 Using thread_id: {thread_id} (mode: {normalized_source})")
+        print(f"Using thread_id: {thread_id} (mode: {normalized_source})")
 
         # Create dynamic system prompt based on mode and service
         mode_type = request.mode_type or "ask"
         selected_service = request.selected_service
         dynamic_system_message = create_system_prompt(
             mode_type=mode_type, selected_service=selected_service)
-        print(f"🎯 Mode: {mode_type}, Service: {selected_service or 'None'}")
-        print(f"📋 System prompt preview: {dynamic_system_message.content[:200]}...")
+        print(f"Mode: {mode_type}, Service: {selected_service or 'None'}")
+        print(f"System prompt preview: {dynamic_system_message.content[:200]}...")
 
         # Create agent with dynamic system prompt for this request
         request_agent = create_react_agent(
@@ -1137,9 +1137,9 @@ async def chat(request: ChatRequest):
                 elif msg.role == "assistant":
                     message_history.append(AIMessage(content=msg.content))
             print(
-                f"💬 Using short-term memory: {len(message_history)} conversation messages")
+                f"Using short-term memory: {len(message_history)} conversation messages")
         else:
-            print(f"🚫 Short-term memory disabled (mode: {normalized_source})")
+            print(f"Short-term memory disabled (mode: {normalized_source})")
 
         # Add current user message
         message_history.append(HumanMessage(content=augmented_input))
