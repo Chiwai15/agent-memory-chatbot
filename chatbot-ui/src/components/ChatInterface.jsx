@@ -816,7 +816,7 @@ function ChatInterface() {
                         {message.role === 'user' ? 'You' : 'Assistant'}
                       </span>
                       <span className={`text-xs opacity-50`}>
-                        {new Date(message.timestamp).toLocaleTimeString()}
+                        {message.timestamp ? new Date(message.timestamp).toLocaleTimeString() : ''}
                       </span>
                     </div>
                     <div className="text-sm leading-relaxed whitespace-pre-wrap">
@@ -827,7 +827,8 @@ function ChatInterface() {
                           <span className="inline-block w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: colors.text, animationDelay: '300ms' }}></span>
                         </div>
                       ) : (
-                        message.content
+                        /* Strip out [STORED MEMORIES...] context from chat display */
+                        message.content.split('[STORED MEMORIES')[0].trim()
                       )}
                     </div>
 
