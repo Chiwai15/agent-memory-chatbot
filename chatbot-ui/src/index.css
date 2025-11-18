@@ -8,8 +8,7 @@
     -moz-osx-font-smoothing: grayscale;
     background: linear-gradient(135deg, #f0f9ff 0%, #f0f6ff 50%, #ffffff 100%);
     min-height: 100vh;
-    min-width: 1200px;
-    overflow-x: auto;
+    overflow-x: hidden;
   }
 }
 
