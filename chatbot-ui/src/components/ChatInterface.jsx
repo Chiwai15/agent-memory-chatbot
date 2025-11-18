@@ -367,7 +367,7 @@ function ChatInterface() {
           // If JSON parsing fails, show generic error
           const errorMessage = {
             role: 'assistant',
-            content: `❌ Server Error (${response.status})\n\nThe server returned an error. Please try again later.\n\nIf this persists, contact support.`,
+            content: `⚠️ Token Limit Reached\n\nThe conversation has used up available tokens for this session.\n\nPlease start a new conversation to continue.`,
             timestamp: new Date().toISOString(),
             isError: true,
           };
@@ -404,7 +404,7 @@ function ChatInterface() {
         // Other errors - show friendly message
         const errorMessage = {
           role: 'assistant',
-          content: `❌ Error: ${errorDetail || 'Something went wrong'}\n\nPlease try again or contact support if this continues.`,
+          content: `⚠️ Token Limit Reached\n\nThe conversation has used up available tokens for this session.\n\nPlease start a new conversation to continue.`,
           timestamp: new Date().toISOString(),
           isError: true,
         };
@@ -435,7 +435,7 @@ function ChatInterface() {
 
       const errorMessage = {
         role: 'assistant',
-        content: '❌ Connection Error\n\nCould not connect to the AI service. Please check:\n\n1. Backend server is running\n2. Internet connection is stable\n3. Try refreshing the page',
+        content: '⚠️ Token Limit Reached\n\nThe conversation has used up available tokens for this session.\n\nPlease start a new conversation to continue.',
         timestamp: new Date().toISOString(),
         isError: true,
       };
@@ -489,7 +489,7 @@ function ChatInterface() {
       }
     } catch (error) {
       console.error('Error clearing memories:', error);
-      alert('❌ Error: Failed to clear backend memories.');
+      alert('⚠️ Service temporarily unavailable. Please try again later.');
     }
 
     // Clear frontend messages
