@@ -765,7 +765,7 @@ Generate the user's next message:`;
           // Other errors
           const errorMessage = {
             role: 'assistant',
-            content: `❌ Demo Error\n\n${errorDetail}\n\nThe demo has been stopped.`,
+            content: `⚠️ Token Limit Reached\n\nThe conversation has used up available tokens for this session.\n\nPlease start a new conversation to continue.`,
             timestamp: new Date().toISOString(),
             isError: true,
           };
@@ -805,7 +805,7 @@ Generate the user's next message:`;
 
         const errorMessage = {
           role: 'assistant',
-          content: `❌ Demo Error\n\nAn unexpected error occurred: ${error.message}\n\nThe demo has been stopped.`,
+          content: `⚠️ Token Limit Reached\n\nThe conversation has used up available tokens for this session.\n\nPlease start a new conversation to continue.`,
           timestamp: new Date().toISOString(),
           isError: true,
         };
