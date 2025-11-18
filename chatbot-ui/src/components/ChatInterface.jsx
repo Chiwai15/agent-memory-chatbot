@@ -47,6 +47,10 @@ function ChatInterface() {
   const [hoveredSubcategory, setHoveredSubcategory] = useState(null); // Track hovered subcategory for expansion
   const [hoveredServiceItem, setHoveredServiceItem] = useState(null); // Track hovered service item
 
+  // Mobile menu states
+  const [showLeftMenu, setShowLeftMenu] = useState(false);
+  const [showRightMenu, setShowRightMenu] = useState(false);
+
   // Session management - completely rebuilt for reliability
   // STEP 1: Initialize sessions first (single source of truth for session list)
   const [sessions, setSessions] = useState(() => {
@@ -514,6 +518,7 @@ function ChatInterface() {
     setActiveSessionId(sessionId);
     setMessages([]);
     fetchDebugData();
+    setShowLeftMenu(false); // Close mobile menu after switching
     console.debug('[SESSION] ✅ Session switched');
   };
 
@@ -1077,9 +1082,59 @@ Generate the user's next message:`;
         </div>
       </div>
 
-      <div className="flex-1 flex flex-col lg:flex-row p-3 sm:p-4 lg:p-6 gap-3 sm:gap-4 lg:gap-6 overflow-hidden">
-      {/* Sidebar */}
-      <div className="w-full lg:w-80 flex flex-col gap-2 sm:gap-3 lg:gap-4 h-auto lg:h-full">
+      <div className="flex-1 flex flex-col lg:flex-row gap-0 lg:gap-6 lg:p-6 overflow-hidden relative">
+
+      {/* Mobile Overlay - Click to close menus */}
+      {(showLeftMenu || showRightMenu) && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
+          onClick={() => {
+            setShowLeftMenu(false);
+            setShowRightMenu(false);
+          }}
+        />
+      )}
+
+      {/* Mobile Header with Menu Buttons - Only visible on mobile */}
+      <div className="lg:hidden flex items-center justify-between p-3 flex-shrink-0" style={{ backgroundColor: colors.surface, borderBottomWidth: '1px', borderBottomStyle: 'solid', borderBottomColor: colors.border }}>
+        <button
+          onClick={() => setShowLeftMenu(true)}
+          className="p-2 rounded-lg transition-all duration-200 hover:scale-110 active:scale-95"
+          style={{ backgroundColor: colors.hover }}
+        >
+          <svg className="w-6 h-6" style={{ color: colors.primary }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        </button>
+        <h2 className="text-base font-bold" style={{ color: colors.text }}>ServiceAgent</h2>
+        <button
+          onClick={() => setShowRightMenu(true)}
+          className="p-2 rounded-lg transition-all duration-200 hover:scale-110 active:scale-95"
+          style={{ backgroundColor: colors.hover }}
+        >
+          <svg className="w-6 h-6" style={{ color: colors.primary }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+          </svg>
+        </button>
+      </div>
+
+      {/* Left Sidebar - Overlay on mobile, fixed on desktop */}
+      <div className={`
+        fixed lg:relative top-0 left-0 h-full w-80 lg:w-80
+        transform transition-transform duration-300 ease-in-out z-50
+        ${showLeftMenu ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+        flex flex-col gap-2 sm:gap-3 lg:gap-4 p-3 lg:p-0
+      `} style={{ backgroundColor: colors.background }}>
+        {/* Close button for mobile */}
+        <button
+          onClick={() => setShowLeftMenu(false)}
+          className="lg:hidden absolute top-3 right-3 p-2 rounded-lg transition-all duration-200 hover:scale-110 active:scale-95"
+          style={{ backgroundColor: colors.surface }}
+        >
+          <svg className="w-5 h-5" style={{ color: colors.text }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
         {/* Logo Card */}
         <div className="rounded-2xl sm:rounded-3xl p-3 sm:p-3 lg:p-4 flex-shrink-0" style={{ backgroundColor: colors.surface }}>
           <div className="flex items-center gap-2 sm:gap-3">
@@ -1172,10 +1227,16 @@ Generate the user's next message:`;
         </div>
       </div>
 
-      {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col rounded-3xl overflow-hidden h-full" style={{ backgroundColor: colors.surface }}>
-        {/* Messages Container */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8 lg:p-10 min-h-0">
+      {/* Main Chat Area - Fixed for mobile scrolling */}
+      <div className="flex-1 flex flex-col lg:rounded-3xl overflow-hidden" style={{ backgroundColor: colors.surface }}>
+        {/* Messages Container - WhatsApp style with proper scrolling */}
+        <div className="flex-1 overflow-y-auto p-3 sm:p-4 md:p-6 lg:p-10"
+             style={{
+               overflowY: 'auto',
+               WebkitOverflowScrolling: 'touch',
+               height: '100%'
+             }}
+        >
           {messages.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center">
               <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4" style={{ backgroundColor: colors.primary }}>
@@ -1305,8 +1366,13 @@ Generate the user's next message:`;
           )}
         </div>
 
-        {/* Input Container with Mode Selectors */}
-        <div className="p-2 sm:p-3 flex-shrink-0" style={{ borderTopWidth: '1px', borderTopStyle: 'solid', borderTopColor: colors.border }}>
+        {/* Input Container with Mode Selectors - WhatsApp style */}
+        <div className="p-2 sm:p-3 lg:p-4 flex-shrink-0" style={{
+          borderTopWidth: '1px',
+          borderTopStyle: 'solid',
+          borderTopColor: colors.border,
+          backgroundColor: colors.surface
+        }}>
           {/* Compact Mode Selectors - Single Row */}
           <div className="max-w-4xl mx-auto mb-2">
             <div className="flex items-center gap-3 flex-wrap">
@@ -1512,8 +1578,23 @@ Generate the user's next message:`;
         </div>
       </div>
 
-      {/* Debug Panel - ALWAYS VISIBLE */}
-      <div className="w-full lg:w-96 rounded-2xl sm:rounded-3xl overflow-hidden h-auto lg:h-full flex flex-col" style={{ backgroundColor: colors.surface }}>
+      {/* Right Sidebar - Memory Pensieve - Overlay on mobile, fixed on desktop */}
+      <div className={`
+        fixed lg:relative top-0 right-0 h-full w-80 sm:w-96 lg:w-96
+        transform transition-transform duration-300 ease-in-out z-50
+        ${showRightMenu ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'}
+        lg:rounded-3xl overflow-hidden flex flex-col
+      `} style={{ backgroundColor: colors.surface }}>
+        {/* Close button for mobile */}
+        <button
+          onClick={() => setShowRightMenu(false)}
+          className="lg:hidden absolute top-3 left-3 p-2 rounded-lg transition-all duration-200 hover:scale-110 active:scale-95 z-10"
+          style={{ backgroundColor: colors.hover }}
+        >
+          <svg className="w-5 h-5" style={{ color: colors.text }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
         <div className="p-4 sm:p-6 lg:p-8 flex-shrink-0" style={{ borderBottomWidth: '1px', borderBottomStyle: 'solid', borderBottomColor: colors.border }}>
           <h2 className="text-base sm:text-lg font-bold" style={{ color: colors.text }}>Memory Pensieve</h2>
           <p className="text-xs mt-1" style={{ color: colors.textLight }}>Mode: {memorySource === 'short' ? 'Short-term only' : memorySource === 'long' ? 'Long-term only' : 'Both'}</p>
