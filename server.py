@@ -1460,7 +1460,7 @@ async def chat(request: ChatRequest):
     except Exception as e:
         # Only catch non-HTTP exceptions - don't leak sensitive error details
         print(f"Unexpected error in chat endpoint: {str(e)}")
-        raise HTTPException(status_code=500, detail="An unexpected error occurred")
+        raise HTTPException(status_code=500, detail="Token limit reached. Please start a new conversation.")
 
 
 @app.get("/api/config")
