@@ -1084,10 +1084,10 @@ Generate the user's next message:`;
 
       <div className="flex-1 flex flex-col lg:flex-row gap-0 lg:gap-6 lg:p-6 overflow-hidden relative">
 
-      {/* Mobile Overlay - Click to close menus */}
+      {/* Mobile Overlay - Click to close menus (transparent but clickable) */}
       {(showLeftMenu || showRightMenu) && (
         <div
-          className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
+          className="fixed inset-0 z-40 lg:hidden"
           onClick={() => {
             setShowLeftMenu(false);
             setShowRightMenu(false);
