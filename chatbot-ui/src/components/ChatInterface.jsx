@@ -1520,7 +1520,7 @@ Generate the user's next message:`;
           <p className="text-xs mt-1" style={{ color: colors.textLight }}>User ID: {userId}</p>
           <div className="mt-1 p-2 rounded-lg" style={{ backgroundColor: colors.hover }}>
             <p className="text-xs" style={{ color: colors.text }}>
-              💡 Conversation compacting happens every 30 messages for long-term memory
+              💡 Memory compacting: Merges duplicate entities every 30 messages
             </p>
           </div>
         </div>

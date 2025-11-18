@@ -354,6 +354,109 @@ Analyze the conversation and respond with ONLY valid JSON:"""
             return None
 
 
+async def compact_long_term_memories(user_id: str) -> int:
+    """
+    Compact long-term memories by merging duplicates and consolidating related information.
+
+    Strategy:
+    - Merge duplicate entities (same type + similar value)
+    - Keep highest confidence version
+    - Update to most recent temporal status
+    - Combine reference sentences
+    - Remove low-confidence duplicates
+
+    Args:
+        user_id: User identifier
+
+    Returns:
+        Number of memories compacted (removed)
+    """
+    try:
+        namespace = ("memories", user_id)
+        memories = await global_store.asearch(namespace, query="")
+
+        if not memories or len(memories) < 5:  # Don't compact if too few memories
+            print(f"Skipping compacting - only {len(memories)} memories")
+            return 0
+
+        print(f"Starting memory compacting for {len(memories)} memories...")
+
+        # Group memories by entity type and value
+        memory_groups = {}
+        for mem in memories:
+            entity_type = mem.value.get("entity_type", "unknown")
+            entity_value = mem.value.get("entity_value", "").lower().strip()
+
+            # Create a key for grouping (type + normalized value)
+            group_key = f"{entity_type}:{entity_value}"
+
+            if group_key not in memory_groups:
+                memory_groups[group_key] = []
+
+            memory_groups[group_key].append(mem)
+
+        compacted_count = 0
+
+        # Process each group
+        for group_key, group_memories in memory_groups.items():
+            if len(group_memories) <= 1:
+                continue  # No duplicates to merge
+
+            # Sort by: temporal_status priority (current > future > past > null), then confidence, then timestamp
+            temporal_priority = {"current": 3, "future": 2, "past": 1, None: 0, "null": 0}
+
+            sorted_memories = sorted(
+                group_memories,
+                key=lambda m: (
+                    temporal_priority.get(m.value.get("temporal_status"), 0),
+                    m.value.get("confidence", 0),
+                    m.value.get("timestamp", "")
+                ),
+                reverse=True
+            )
+
+            # Keep the best memory (highest priority)
+            best_memory = sorted_memories[0]
+            duplicates = sorted_memories[1:]
+
+            # Merge information from duplicates into best memory
+            reference_sentences = [best_memory.value.get("reference_sentence", "")]
+            contexts = [best_memory.value.get("context", "")]
+
+            for dup in duplicates:
+                ref = dup.value.get("reference_sentence")
+                if ref and ref not in reference_sentences:
+                    reference_sentences.append(ref)
+
+                ctx = dup.value.get("context")
+                if ctx and ctx not in contexts:
+                    contexts.append(ctx)
+
+            # Update best memory with consolidated info
+            updated_data = best_memory.value.copy()
+            updated_data["reference_sentence"] = " | ".join(filter(None, reference_sentences))
+            updated_data["context"] = " ".join(filter(None, contexts))
+            updated_data["compacted"] = True
+            updated_data["compacted_from"] = len(duplicates)
+
+            # Update the best memory
+            await global_store.aput(namespace, best_memory.key, updated_data)
+
+            # Delete duplicates
+            for dup in duplicates:
+                await global_store.adelete(namespace, dup.key)
+                compacted_count += 1
+
+            print(f"Compacted {len(duplicates)} duplicates for: {group_key}")
+
+        print(f"Memory compacting complete: {compacted_count} memories removed, {len(memory_groups)} unique entities")
+        return compacted_count
+
+    except Exception as e:
+        print(f"Error during memory compacting: {e}")
+        return 0
+
+
 # Define a function to create dynamic system prompts based on mode and service
 def create_system_prompt(mode_type: str = "ask",
                          selected_service: str = None) -> SystemMessage:
@@ -1328,6 +1431,18 @@ async def chat(request: ChatRequest):
                 print(f"No memorable information to store")
                 if extraction:
                     print(f"   Reason: should_store={extraction.should_store}, entities={len(extraction.entities)}, importance={extraction.importance:.2f}")
+
+        # Trigger memory compacting every 30 messages
+        message_count = len(request.messages)
+        if message_count > 0 and message_count % 30 == 0:
+            print(f"Triggering memory compacting at {message_count} messages...")
+            try:
+                compacted_count = await compact_long_term_memories(request.user_id)
+                if compacted_count > 0:
+                    print(f"Compacted {compacted_count} duplicate memories")
+            except Exception as e:
+                print(f"Memory compacting failed: {e}")
+                # Don't fail the request if compacting fails
 
         return ChatResponse(
             response=response_content,
