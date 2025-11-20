@@ -42,6 +42,8 @@ function ChatInterface() {
   const [modeType, setModeType] = useState('agent'); // Default to 'agent' mode - toggleable
   const [showModeDropup, setShowModeDropup] = useState(false); // Mode type dropup visibility
   const [hoveredModeType, setHoveredModeType] = useState(null); // Track hovered mode type
+  const [showMemoryDropup, setShowMemoryDropup] = useState(false); // Memory mode dropup visibility
+  const [hoveredMemoryMode, setHoveredMemoryMode] = useState(null); // Track hovered memory mode
   const [selectedService, setSelectedService] = useState(''); // Selected service ID
   const [showServiceDropup, setShowServiceDropup] = useState(false); // Service dropup visibility
   const [hoveredSubcategory, setHoveredSubcategory] = useState(null); // Track hovered subcategory for expansion
@@ -116,6 +118,7 @@ function ChatInterface() {
   const inputRef = useRef(null);
   const modeDropupRef = useRef(null);
   const serviceDropupRef = useRef(null);
+  const memoryDropupRef = useRef(null);
 
   // Click-outside detection for dropdowns
   useEffect(() => {
@@ -129,10 +132,14 @@ function ChatInterface() {
         setShowServiceDropup(false);
         setHoveredSubcategory(null); // Also reset expanded subcategory
       }
+      // Close memory dropdown if clicking outside
+      if (memoryDropupRef.current && !memoryDropupRef.current.contains(event.target)) {
+        setShowMemoryDropup(false);
+      }
     };
 
     // Add event listener when dropdowns are open
-    if (showModeDropup || showServiceDropup) {
+    if (showModeDropup || showServiceDropup || showMemoryDropup) {
       document.addEventListener('mousedown', handleClickOutside);
     }
 
@@ -140,7 +147,7 @@ function ChatInterface() {
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [showModeDropup, showServiceDropup]);
+  }, [showModeDropup, showServiceDropup, showMemoryDropup]);
 
   // STEP 3: Persist sessions to localStorage whenever they change
   useEffect(() => {
@@ -1498,50 +1505,60 @@ Generate the user's next message:`;
               {/* Divider */}
               <div className="h-4 w-px" style={{ backgroundColor: colors.border }}></div>
 
-              {/* Memory Mode Selector */}
-              <div className="flex items-center gap-1.5">
-                <span className="text-[10px] font-medium uppercase tracking-wide" style={{ color: colors.textLight }}>Memory:</span>
-                <div className="flex gap-1.5">
-                  <button
-                    onClick={() => setMemorySource('short')}
-                    className="px-2 py-1 rounded-lg text-[10px] font-medium transition-all duration-200 hover:opacity-80"
-                    style={{
-                      backgroundColor: memorySource === 'short' ? colors.primary : colors.surface,
-                      color: memorySource === 'short' ? 'white' : colors.text,
-                      borderWidth: '1px',
-                      borderStyle: 'solid',
-                      borderColor: memorySource === 'short' ? colors.primary : colors.border
-                    }}
-                  >
-                    Short
-                  </button>
-                  <button
-                    onClick={() => setMemorySource('long')}
-                    className="px-2 py-1 rounded-lg text-[10px] font-medium transition-all duration-200 hover:opacity-80"
-                    style={{
-                      backgroundColor: memorySource === 'long' ? colors.secondary : colors.surface,
-                      color: memorySource === 'long' ? 'white' : colors.text,
-                      borderWidth: '1px',
-                      borderStyle: 'solid',
-                      borderColor: memorySource === 'long' ? colors.secondary : colors.border
-                    }}
-                  >
-                    Long
-                  </button>
-                  <button
-                    onClick={() => setMemorySource('both')}
-                    className="px-2 py-1 rounded-lg text-[10px] font-medium transition-all duration-200 hover:opacity-80"
-                    style={{
-                      backgroundColor: memorySource === 'both' ? colors.primary : colors.surface,
-                      color: memorySource === 'both' ? 'white' : colors.text,
-                      borderWidth: '1px',
-                      borderStyle: 'solid',
-                      borderColor: memorySource === 'both' ? colors.primary : colors.border
-                    }}
-                  >
-                    Both
-                  </button>
-                </div>
+              {/* Memory Mode Selector - Dropup style */}
+              <div className="relative" ref={memoryDropupRef}>
+                <button
+                  onClick={() => setShowMemoryDropup(!showMemoryDropup)}
+                  className="pl-3 pr-1.5 py-0.5 rounded-full text-[10px] font-medium transition-all duration-200 hover:opacity-90 flex items-center gap-1.5"
+                  style={{ backgroundColor: '#e8f5e9', color: '#165c33' }}
+                >
+                  <span className="capitalize">{memorySource === 'both' ? 'Both' : memorySource === 'short' ? 'Short' : 'Long'}</span>
+                  <svg className={`w-2.5 h-2.5 transition-transform duration-200 ${showMemoryDropup ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+                {showMemoryDropup && (
+                  <div className="absolute bottom-full left-0 mb-1 w-32 rounded-lg shadow-xl overflow-hidden z-50" style={{ backgroundColor: colors.surface, borderWidth: '1px', borderStyle: 'solid', borderColor: colors.border }}>
+                    <div className="p-1">
+                      <button
+                        onClick={() => { setMemorySource('short'); setShowMemoryDropup(false); }}
+                        onMouseEnter={() => setHoveredMemoryMode('short')}
+                        onMouseLeave={() => setHoveredMemoryMode(null)}
+                        className="w-full text-left px-2 py-1.5 rounded text-[10px] font-medium transition-all duration-200"
+                        style={{
+                          backgroundColor: (memorySource === 'short' || hoveredMemoryMode === 'short') ? '#e8f5e9' : 'transparent',
+                          color: (memorySource === 'short' || hoveredMemoryMode === 'short') ? '#165c33' : colors.text
+                        }}
+                      >
+                        Short-term
+                      </button>
+                      <button
+                        onClick={() => { setMemorySource('long'); setShowMemoryDropup(false); }}
+                        onMouseEnter={() => setHoveredMemoryMode('long')}
+                        onMouseLeave={() => setHoveredMemoryMode(null)}
+                        className="w-full text-left px-2 py-1.5 rounded text-[10px] font-medium transition-all duration-200"
+                        style={{
+                          backgroundColor: (memorySource === 'long' || hoveredMemoryMode === 'long') ? '#e8f5e9' : 'transparent',
+                          color: (memorySource === 'long' || hoveredMemoryMode === 'long') ? '#165c33' : colors.text
+                        }}
+                      >
+                        Long-term
+                      </button>
+                      <button
+                        onClick={() => { setMemorySource('both'); setShowMemoryDropup(false); }}
+                        onMouseEnter={() => setHoveredMemoryMode('both')}
+                        onMouseLeave={() => setHoveredMemoryMode(null)}
+                        className="w-full text-left px-2 py-1.5 rounded text-[10px] font-medium transition-all duration-200"
+                        style={{
+                          backgroundColor: (memorySource === 'both' || hoveredMemoryMode === 'both') ? '#e8f5e9' : 'transparent',
+                          color: (memorySource === 'both' || hoveredMemoryMode === 'both') ? '#165c33' : colors.text
+                        }}
+                      >
+                        Both
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
