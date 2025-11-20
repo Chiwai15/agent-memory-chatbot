@@ -1598,7 +1598,7 @@ Generate the user's next message:`;
         {/* Close button for mobile */}
         <button
           onClick={() => setShowRightMenu(false)}
-          className="lg:hidden absolute top-3 left-3 p-2 rounded-lg transition-all duration-200 hover:scale-110 active:scale-95 z-10"
+          className="lg:hidden absolute top-3 right-3 p-2 rounded-lg transition-all duration-200 hover:scale-110 active:scale-95 z-10"
           style={{ backgroundColor: colors.hover }}
         >
           <svg className="w-5 h-5" style={{ color: colors.text }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
