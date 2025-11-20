@@ -1011,7 +1011,13 @@ Generate the user's next message:`;
       {/* Announcement Bar */}
       <div className="w-full py-2 px-4 sm:px-6 flex-shrink-0" style={{ backgroundColor: colors.primary }}>
         <div className="max-w-7xl mx-auto flex items-center justify-center gap-3">
-          {/* Demo Controls Only */}
+          {/* Warning Text - Hidden on mobile */}
+          <div className="hidden lg:flex items-center gap-2">
+            <span className="text-xs font-medium" style={{ color: colors.textOnDark }}>
+              ⚠️ Demo Mode: Using Llama 3.1 8B (free tier) - responses may be limited
+            </span>
+          </div>
+          {/* Demo Controls */}
           <div className="flex items-center gap-2 flex-shrink-0">
             <select
               value={selectedPersona}
