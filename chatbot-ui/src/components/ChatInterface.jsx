@@ -1494,12 +1494,14 @@ Generate the user's next message:`;
               <div className="h-4 w-px" style={{ backgroundColor: colors.border }}></div>
 
               {/* Memory Mode Selector - Dropup style */}
-              <div className="relative" ref={memoryDropupRef}>
-                <button
-                  onClick={() => setShowMemoryDropup(!showMemoryDropup)}
-                  className="pl-3 pr-1.5 py-0.5 rounded-full text-[10px] font-medium transition-all duration-200 hover:opacity-90 flex items-center gap-1.5"
-                  style={{ backgroundColor: '#e8f5e9', color: '#165c33' }}
-                >
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] font-medium" style={{ color: colors.textLight }}>Memory:</span>
+                <div className="relative" ref={memoryDropupRef}>
+                  <button
+                    onClick={() => setShowMemoryDropup(!showMemoryDropup)}
+                    className="pl-3 pr-1.5 py-0.5 rounded-full text-[10px] font-medium transition-all duration-200 hover:opacity-90 flex items-center gap-1.5"
+                    style={{ backgroundColor: '#e8f5e9', color: '#165c33' }}
+                  >
                   <span className="capitalize">{memorySource === 'both' ? 'Both' : memorySource === 'short' ? 'Short' : 'Long'}</span>
                   <svg className={`w-2.5 h-2.5 transition-transform duration-200 ${showMemoryDropup ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -1547,6 +1549,7 @@ Generate the user's next message:`;
                     </div>
                   </div>
                 )}
+                </div>
               </div>
             </div>
           </div>
